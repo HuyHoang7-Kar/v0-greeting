@@ -41,7 +41,8 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // 1. Đăng ký với Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -53,6 +54,21 @@ export default function SignUpPage() {
         },
       })
       if (error) throw error
+
+      // 2. Insert vào bảng users (public.users) nếu đăng ký thành công
+      if (data.user) {
+        const { error: userInsertError } = await supabase.from("users").insert([
+          {
+            auth_id: data.user.id,
+            email: data.user.email,
+            name: fullName,
+            role: role,
+            // created_at: tự động
+          },
+        ])
+        if (userInsertError) throw userInsertError
+      }
+
       router.push("/auth/signup-success")
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Đã xảy ra lỗi")
