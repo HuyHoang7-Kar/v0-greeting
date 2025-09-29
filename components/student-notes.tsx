@@ -27,7 +27,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
   const [newNote, setNewNote] = useState({ title: "", content: "" })
   const [editNote, setEditNote] = useState({ title: "", content: "" })
   const [isLoading, setIsLoading] = useState(false)
-
+  
   const handleCreateNote = async () => {
     if (!newNote.title.trim() || !newNote.content.trim()) return
 
