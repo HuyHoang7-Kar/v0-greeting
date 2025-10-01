@@ -28,12 +28,12 @@ export default function SignUpPage() {
     setIsLoading(true)
     setError(null)
 
+    // kiểm tra mật khẩu
     if (password !== confirmPassword) {
       setError("Mật khẩu không khớp")
       setIsLoading(false)
       return
     }
-
     if (password.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự")
       setIsLoading(false)
@@ -42,20 +42,22 @@ export default function SignUpPage() {
 
     try {
       // 1. Đăng ký với Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
-          data: {
-            full_name: fullName,
-            role: role,
-          },
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/dashboard`,
         },
       })
-      if (error) throw error
 
-      // 2. Insert vào bảng users (public.users) nếu đăng ký thành công
+      if (signUpError) {
+        console.error("SignUp Error:", signUpError.message)
+        throw signUpError
+      }
+
+      // 2. Insert vào bảng users
       if (data.user) {
         const { error: userInsertError } = await supabase.from("users").insert([
           {
@@ -63,15 +65,20 @@ export default function SignUpPage() {
             email: data.user.email,
             name: fullName,
             role: role,
-            // created_at: tự động
           },
         ])
-        if (userInsertError) throw userInsertError
+
+        if (userInsertError) {
+          console.error("Insert User Error:", userInsertError.message)
+          throw userInsertError
+        }
       }
 
+      // Thành công -> chuyển trang
       router.push("/auth/signup-success")
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Đã xảy ra lỗi")
+    } catch (err: unknown) {
+      console.error("Signup Catch Error:", err)
+      setError(err instanceof Error ? err.message : "Đã xảy ra lỗi")
     } finally {
       setIsLoading(false)
     }
@@ -82,8 +89,12 @@ export default function SignUpPage() {
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-0">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-3xl font-bold text-gray-900">Tham Gia EduCards</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">Tạo tài khoản để bắt đầu học tập</CardDescription>
+            <CardTitle className="text-3xl font-bold text-gray-900">
+              Tham Gia EduCards
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Tạo tài khoản để bắt đầu học tập
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSignUp} className="space-y-4">
@@ -101,6 +112,7 @@ export default function SignUpPage() {
                   className="h-11"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Địa Chỉ Email
@@ -115,11 +127,15 @@ export default function SignUpPage() {
                   className="h-11"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-sm font-medium text-gray-700">
                   Tôi là
                 </Label>
-                <Select value={role} onValueChange={(value: "student" | "teacher") => setRole(value)}>
+                <Select
+                  value={role}
+                  onValueChange={(value: "student" | "teacher") => setRole(value)}
+                >
                   <SelectTrigger className="h-11">
                     <SelectValue placeholder="Chọn vai trò của bạn" />
                   </SelectTrigger>
@@ -129,6 +145,7 @@ export default function SignUpPage() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                   Mật Khẩu
@@ -142,6 +159,7 @@ export default function SignUpPage() {
                   className="h-11"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
                   Xác Nhận Mật Khẩu
@@ -155,9 +173,13 @@ export default function SignUpPage() {
                   className="h-11"
                 />
               </div>
+
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {error}
+                </div>
               )}
+
               <Button
                 type="submit"
                 className="w-full h-11 bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
@@ -166,10 +188,14 @@ export default function SignUpPage() {
                 {isLoading ? "Đang tạo tài khoản..." : "Tạo Tài Khoản"}
               </Button>
             </form>
+
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Đã có tài khoản?{" "}
-                <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">
+                <Link
+                  href="/auth/login"
+                  className="font-medium text-yellow-600 hover:text-yellow-500"
+                >
                   Đăng nhập tại đây
                 </Link>
               </p>
