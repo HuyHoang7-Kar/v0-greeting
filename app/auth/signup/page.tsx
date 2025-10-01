@@ -1,6 +1,9 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -8,38 +11,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
 
 export default function SignUpPage() {
+  const router = useRouter()
+  const supabase = createClient()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [role, setRole] = useState<"student" | "teacher">("student")
+
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
-    setIsLoading(true)
     setError(null)
 
     // kiểm tra mật khẩu
     if (password !== confirmPassword) {
       setError("Mật khẩu không khớp")
-      setIsLoading(false)
       return
     }
     if (password.length < 6) {
       setError("Mật khẩu phải có ít nhất 6 ký tự")
-      setIsLoading(false)
       return
     }
 
+    setIsLoading(true)
     try {
       // 1. Đăng ký với Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -47,7 +47,7 @@ export default function SignUpPage() {
         password,
         options: {
           emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ||
             `${window.location.origin}/auth/callback`,
         },
       })
@@ -58,15 +58,9 @@ export default function SignUpPage() {
         return
       }
 
-      // 2. Nếu cần xác nhận email (user tồn tại nhưng chưa có session)
-      if (data.user && !data.session) {
-        router.push("/auth/check-email")
-        return
-      }
-
-      // 3. Nếu có session ngay (không cần xác nhận email)
-      if (data.user && data.session) {
-        const { error: userInsertError } = await supabase.from("users").insert([
+      // 2. Insert profile nếu có user ngay
+      if (data.user) {
+        await supabase.from("profiles").insert([
           {
             auth_id: data.user.id,
             email: data.user.email,
@@ -74,15 +68,10 @@ export default function SignUpPage() {
             role: role,
           },
         ])
-
-        if (userInsertError) {
-          console.error("Insert User Error:", userInsertError.message)
-          setError(userInsertError.message)
-          return
-        }
-
-        router.push("/dashboard")
       }
+
+      // 3. Dù có session hay cần verify email → đều chuyển sang trang success
+      router.push("/auth/signup-success")
     } catch (err: unknown) {
       console.error("Signup Catch Error:", err)
       setError(err instanceof Error ? err.message : "Đã xảy ra lỗi")
@@ -106,9 +95,7 @@ export default function SignUpPage() {
           <CardContent className="pt-6">
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
-                  Họ và Tên
-                </Label>
+                <Label htmlFor="fullName">Họ và Tên</Label>
                 <Input
                   id="fullName"
                   type="text"
@@ -116,14 +103,11 @@ export default function SignUpPage() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Địa Chỉ Email
-                </Label>
+                <Label htmlFor="email">Địa Chỉ Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -131,19 +115,13 @@ export default function SignUpPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role" className="text-sm font-medium text-gray-700">
-                  Tôi là
-                </Label>
-                <Select
-                  value={role}
-                  onValueChange={(value: "student" | "teacher") => setRole(value)}
-                >
-                  <SelectTrigger className="h-11">
+                <Label htmlFor="role">Tôi là</Label>
+                <Select value={role} onValueChange={(value: "student" | "teacher") => setRole(value)}>
+                  <SelectTrigger>
                     <SelectValue placeholder="Chọn vai trò của bạn" />
                   </SelectTrigger>
                   <SelectContent>
@@ -154,30 +132,24 @@ export default function SignUpPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                  Mật Khẩu
-                </Label>
+                <Label htmlFor="password">Mật Khẩu</Label>
                 <Input
                   id="password"
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-                  Xác Nhận Mật Khẩu
-                </Label>
+                <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-11"
                 />
               </div>
 
@@ -189,7 +161,7 @@ export default function SignUpPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
                 disabled={isLoading}
               >
                 {isLoading ? "Đang tạo tài khoản..." : "Tạo Tài Khoản"}
@@ -199,10 +171,7 @@ export default function SignUpPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Đã có tài khoản?{" "}
-                <Link
-                  href="/auth/login"
-                  className="font-medium text-yellow-600 hover:text-yellow-500"
-                >
+                <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">
                   Đăng nhập tại đây
                 </Link>
               </p>

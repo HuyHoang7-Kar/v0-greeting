@@ -10,17 +10,18 @@ export default function SignUpSuccessPage() {
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Account Created!</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              Tạo tài khoản thành công!
+            </CardTitle>
             <CardDescription className="text-gray-600 mt-2">
-              Please check your email to verify your account
+              Vui lòng kiểm tra email để xác minh tài khoản của bạn
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <p className="text-sm text-blue-800">
-                {
-                  "We've sent a verification email to your inbox. Please click the link in the email to activate your account and start learning!"
-                }
+                Chúng tôi đã gửi một email xác nhận đến hộp thư của bạn. 
+                Hãy nhấp vào liên kết trong email để kích hoạt tài khoản và bắt đầu học tập!
               </p>
             </div>
           </CardContent>
