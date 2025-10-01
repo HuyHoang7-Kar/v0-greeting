@@ -46,19 +46,20 @@ export default function SignUpPage() {
         email,
         password,
         options: {
+          // 🔥 Chuyển hướng về trang login sau khi confirm email
           emailRedirectTo:
             process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/auth/callback`,
+            `${window.location.origin}/auth/login`,
         },
       })
 
       if (signUpError) {
         console.error("SignUp Error:", signUpError.message)
-        setError(signUpError.message)
+        setError("Đăng ký thất bại, vui lòng thử lại.")
         return
       }
 
-      // 2. Insert profile nếu có user ngay
+      // 2. Insert profile nếu có user ngay (trường hợp email không cần verify)
       if (data.user) {
         await supabase.from("profiles").insert([
           {
