@@ -1,15 +1,15 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -25,14 +25,30 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
-      if (error) throw error
+
+      if (error) {
+        // Lỗi đăng nhập (sai pass, email chưa xác thực, ...)
+        console.error("Supabase login error:", error)
+        setError(error.message)
+        return
+      }
+
+      if (!data.user) {
+        setError("Không tìm thấy người dùng. Vui lòng thử lại.")
+        return
+      }
+
+      console.log("Login success:", data.user)
+
+      // ✅ Đăng nhập thành công → chuyển hướng
       router.push("/dashboard")
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+    } catch (err: any) {
+      console.error("Unexpected error:", err)
+      setError(err?.message || "Đã xảy ra lỗi không xác định")
     } finally {
       setIsLoading(false)
     }
@@ -44,7 +60,9 @@ export default function LoginPage() {
         <Card className="shadow-xl border-0">
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-3xl font-bold text-gray-900">Chào Mừng Trở Lại</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">Đăng nhập để tiếp tục hành trình học tập</CardDescription>
+            <CardDescription className="text-gray-600 mt-2">
+              Đăng nhập để tiếp tục hành trình học tập
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleLogin} className="space-y-4">
@@ -76,7 +94,9 @@ export default function LoginPage() {
                 />
               </div>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {error}
+                </div>
               )}
               <Button
                 type="submit"
