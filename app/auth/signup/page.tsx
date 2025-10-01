@@ -48,17 +48,24 @@ export default function SignUpPage() {
         options: {
           emailRedirectTo:
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/dashboard`,
+            `${window.location.origin}/auth/callback`,
         },
       })
 
       if (signUpError) {
         console.error("SignUp Error:", signUpError.message)
-        throw signUpError
+        setError(signUpError.message)
+        return
       }
 
-      // 2. Insert vào bảng users
-      if (data.user) {
+      // 2. Nếu cần xác nhận email (user tồn tại nhưng chưa có session)
+      if (data.user && !data.session) {
+        router.push("/auth/check-email")
+        return
+      }
+
+      // 3. Nếu có session ngay (không cần xác nhận email)
+      if (data.user && data.session) {
         const { error: userInsertError } = await supabase.from("users").insert([
           {
             auth_id: data.user.id,
@@ -70,12 +77,12 @@ export default function SignUpPage() {
 
         if (userInsertError) {
           console.error("Insert User Error:", userInsertError.message)
-          throw userInsertError
+          setError(userInsertError.message)
+          return
         }
-      }
 
-      // Thành công -> chuyển trang
-      router.push("/auth/signup-success")
+        router.push("/dashboard")
+      }
     } catch (err: unknown) {
       console.error("Signup Catch Error:", err)
       setError(err instanceof Error ? err.message : "Đã xảy ra lỗi")
