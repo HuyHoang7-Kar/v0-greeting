@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import type React from "react"
 import { useState } from "react"
@@ -29,7 +29,6 @@ export default function SignUpPage() {
     e.preventDefault()
     setError(null)
 
-    // kiểm tra mật khẩu
     if (password !== confirmPassword) {
       setError("Mật khẩu không khớp")
       return
@@ -41,38 +40,53 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      // 1. Đăng ký với Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      // 1) Sign up — embed role + full_name into user metadata (key: data OR user_metadata depending on supabase version)
+      const signUpPayload: any = {
         email,
         password,
         options: {
-          // 🔥 Chuyển hướng về trang login sau khi confirm email
           emailRedirectTo:
             process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ||
             `${window.location.origin}/auth/login`,
-        },
-      })
+          // Supabase v2 supports `data` for metadata; older libs used user_metadata
+          data: { role, full_name: fullName }
+        }
+      }
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp(signUpPayload as any)
 
       if (signUpError) {
-        console.error("SignUp Error:", signUpError.message)
-        setError("Đăng ký thất bại, vui lòng thử lại.")
+        console.error("SignUp Error:", signUpError)
+        setError(signUpError.message || "Đăng ký thất bại, vui lòng thử lại.")
         return
       }
 
-      // 2. Insert profile nếu có user ngay (trường hợp email không cần verify)
-      if (data.user) {
-        await supabase.from("profiles").insert([
-          {
-            auth_id: data.user.id,
-            email: data.user.email,
-            name: fullName,
-            role: role,
-          },
-        ])
+      // 2) If server returned user immediately (no email confirm required), upsert profile now
+      //    If user must verify email, DB trigger (see SQL below) will create profile from metadata.
+      const uid = signUpData?.user?.id
+      if (uid) {
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert(
+            [
+              {
+                id: uid,             // profiles.id FK -> auth.users.id
+                full_name: fullName,
+                role: role
+              }
+            ],
+            { returning: 'minimal' } // reduce payload
+          )
+        if (upsertError) {
+          console.error("Upsert profile error:", upsertError)
+          // không block flow nhưng báo nhẹ
+          setError("Đăng ký thành công nhưng lưu profile thất bại. Liên hệ admin.")
+          // continue to redirect
+        }
       }
 
-      // 3. Dù có session hay cần verify email → đều chuyển sang trang success
-      router.push("/auth/signup-success")
+      // 3) redirect to signup-success (or instruct: check email)
+      router.push('/auth/signup-success')
     } catch (err: unknown) {
       console.error("Signup Catch Error:", err)
       setError(err instanceof Error ? err.message : "Đã xảy ra lỗi")
@@ -97,26 +111,12 @@ export default function SignUpPage() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Họ và Tên</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Nguyễn Văn A"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                />
+                <Input id="fullName" type="text" placeholder="Nguyễn Văn A" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Địa Chỉ Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nguyen@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                <Input id="email" type="email" placeholder="nguyen@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
 
               <div className="space-y-2">
@@ -134,48 +134,23 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Mật Khẩu</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
+                <Input id="confirmPassword" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
 
-              <Button
-                type="submit"
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium" disabled={isLoading}>
                 {isLoading ? "Đang tạo tài khoản..." : "Tạo Tài Khoản"}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Đã có tài khoản?{" "}
-                <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">
-                  Đăng nhập tại đây
-                </Link>
-              </p>
+              <p className="text-sm text-gray-600">Đã có tài khoản? <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">Đăng nhập tại đây</Link></p>
             </div>
           </CardContent>
         </Card>
