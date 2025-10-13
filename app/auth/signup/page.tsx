@@ -25,25 +25,42 @@ export default function SignUpPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Optional: call server API to upsert profile using service role key (bypass RLS)
-  async function serverUpsertProfile(userId: string) {
+  // serverUpsertProfile can accept either id or email
+  async function serverUpsertProfile(opts: { id?: string; email?: string }) {
     try {
       const res = await fetch('/api/internal/upsert-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, full_name: fullName, role })
+        body: JSON.stringify({
+          ...opts,
+          full_name: fullName,
+          role,
+        }),
       })
       const j = await res.json()
-      if (!res.ok) {
-        console.warn('server upsert-profile response error', j)
-      } else {
-        console.log('server upsert-profile ok', j)
-      }
-      return j
+      return { ok: res.ok, status: res.status, body: j }
     } catch (err) {
       console.error('serverUpsertProfile error', err)
-      return { error: String(err) }
+      return { ok: false, status: 500, body: { error: String(err) } }
     }
+  }
+
+  // helper: retry polling for user/profile readiness
+  async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const res = await serverUpsertProfile({ email: emailToCheck })
+      if (res.ok && res.body?.ok) {
+        return { ok: true, profile: res.body.profile ?? null }
+      }
+      if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
+        // wait then retry
+        await new Promise((r) => setTimeout(r, delayMs))
+        continue
+      }
+      // other errors -> return
+      return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
+    }
+    return { ok: false, error: 'timeout_waiting_for_user', status: 408 }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -62,7 +79,6 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      // Prepare metadata under both keys (data and user_metadata) to support SDK variations
       const signupOptions: any = {
         emailRedirectTo:
           process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
@@ -79,23 +95,27 @@ export default function SignUpPage() {
       console.debug('signUp response:', signUpData, signUpError)
 
       if (signUpError) {
-        // show helpful message if supabase returns an error
         console.error('SignUp Error:', signUpError)
         setError(signUpError.message ?? 'Đăng ký thất bại, vui lòng thử lại.')
         setIsLoading(false)
         return
       }
 
-      // If signUp returns a user id immediately (auto-confirm flows), call server upsert to ensure profiles created.
-      const userId = signUpData?.user?.id
+      const userId = signUpData?.user?.id ?? null
+
       if (userId) {
-        // call server to upsert profile using service role (safe)
-        await serverUpsertProfile(userId)
+        // if SDK returned user id immediately, upsert with id
+        const res = await serverUpsertProfile({ id: userId })
+        if (!res.ok) console.warn('server upsert-profile (by id) failed', res)
+      } else {
+        // If no id returned (email confirmation flow), call server with email and retry polling
+        const res = await tryUpsertWithRetry(email)
+        if (!res.ok) {
+          console.warn('server upsert-profile (by email) failed or timed out', res)
+        }
       }
 
-      // Inform user next steps (check email if verification required)
       setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
-      // redirect to signup-success (or you can show message)
       router.push('/auth/signup-success')
     } catch (err: unknown) {
       console.error('Signup Catch Error:', err)
