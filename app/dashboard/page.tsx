@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { StudentDashboard } from "@/components/student/dashboard"
+import { StudentDashboard } from "@/components/student-dashboard"
 import { TeacherDashboard } from "@/components/teacher/dashboard"
 
 export default async function DashboardPage() {

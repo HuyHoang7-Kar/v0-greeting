@@ -2,20 +2,16 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-
-import { CreateFlashcardForm } from "@/components/teacher/create-flashcard-form"
-import { TeacherFlashcards } from "@/components/teacher/flashcards"
-import { TeacherQuizzes } from "@/components/teacher/quizzes"
-import { TeacherAnalytics } from "@/components/teacher/analytics"
-
+import { CreateFlashcardForm } from "@components/teacher/create-flashcard-form"
+import { TeacherFlashcards } from "@components/teacher/flashcards"
+import { TeacherQuizzes } from "@components/teacher/quizzes"
+import { TeacherAnalytics } from "@components/teacher/analytics"
 import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
-
+import { useRouter } from "next/navigation"
 
 interface Profile {
   id: string
