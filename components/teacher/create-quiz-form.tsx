@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,31 +28,55 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
     try {
       const supabase = createClient()
 
-      // Get current user
+      // lấy current user (session)
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser()
-      if (userError || !user) {
+
+      if (userError) {
+        console.error("getUser error:", userError)
+        throw new Error(userError.message ?? "Could not get user")
+      }
+      if (!user) {
         throw new Error("You must be logged in to create quizzes")
       }
 
-      // Create quiz
-      const { error: insertError } = await supabase.from("quizzes").insert({
+      // Insert — gửi cả created_by và teacher_id để tương thích với cấu trúc DB của bạn
+      // (nếu DB chỉ cần 1 trong 2 thì vẫn ok; gửi cả 2 tránh bị thiếu cột bắt buộc)
+      const payload = {
         title: title.trim(),
         description: description.trim(),
-        created_by: user.id,
-      })
+        created_by: user.id,  // cột hiện có NOT NULL trong DB của bạn
+        teacher_id: user.id,  // cột tồn tại trong DB (nullable) — dùng cho policy nếu cần
+      }
 
-      if (insertError) throw insertError
+      console.debug("Creating quiz with payload:", payload)
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("quizzes")
+        .insert(payload)
+        .select() // trả về row để dễ debug
+
+      if (insertError) {
+        // log chi tiết để debug (Network tab có thể cũng show)
+        console.error("Insert quiz error (raw):", insertError)
+        // convert PostgrestError sang Error để catch xử lý nhất quán
+        throw new Error(insertError.message ?? JSON.stringify(insertError))
+      }
+
+      console.log("Inserted quiz:", inserted)
 
       // Reset form
       setTitle("")
       setDescription("")
 
       onSuccess?.()
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+    } catch (err: unknown) {
+      console.error("Create quiz failed:", err)
+      const msg =
+        err instanceof Error ? err.message : JSON.stringify(err, Object.getOwnPropertyNames(err))
+      setError(msg || "An error occurred")
     } finally {
       setIsLoading(false)
     }
