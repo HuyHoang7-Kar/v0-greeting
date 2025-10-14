@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,25 +30,43 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
     try {
       const supabase = createClient()
 
-      // Get current user
+      // Lấy user hiện tại từ session
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser()
-      if (userError || !user) {
+
+      if (userError) {
+        console.error("getUser error:", userError)
+        throw new Error(userError.message ?? "Could not get user")
+      }
+      if (!user) {
         throw new Error("You must be logged in to create flashcards")
       }
 
-      // Create flashcard
-      const { error: insertError } = await supabase.from("flashcards").insert({
+      const payload = {
         question: question.trim(),
         answer: answer.trim(),
         category: category.trim() || null,
         difficulty,
-        created_by: user.id,
-      })
+        created_by: user.id, // <-- gửi cột này (phù hợp DB hiện tại)
+      }
 
-      if (insertError) throw insertError
+      console.debug("Creating flashcard payload:", payload)
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("flashcards")
+        .insert(payload)
+        .select() // trả về record đã chèn
+
+      if (insertError) {
+        // Log chi tiết để bạn thấy trong console (Network cũng có response)
+        console.error("Insert flashcard error (raw):", insertError)
+        // normalize to Error để catch có message
+        throw new Error(insertError.message ?? JSON.stringify(insertError))
+      }
+
+      console.log("Inserted flashcard:", inserted)
 
       // Reset form
       setQuestion("")
@@ -59,8 +75,11 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
       setDifficulty("medium")
 
       onSuccess?.()
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+    } catch (err: unknown) {
+      console.error("Create flashcard failed:", err)
+      const msg =
+        err instanceof Error ? err.message : JSON.stringify(err, Object.getOwnPropertyNames(err))
+      setError(msg || "An error occurred")
     } finally {
       setIsLoading(false)
     }
