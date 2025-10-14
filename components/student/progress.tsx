@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -17,9 +18,12 @@ interface QuizResult {
 
 interface StudentProgressProps {
   results: QuizResult[]
+  studentId: string // 🔹 thêm studentId để biết ai là người chơi
 }
 
-export function StudentProgress({ results }: StudentProgressProps) {
+export function StudentProgress({ results, studentId }: StudentProgressProps) {
+  const [isSaving, setIsSaving] = useState(false)
+
   const totalQuizzes = results.length
   const totalScore = results.reduce((sum, result) => sum + result.score, 0)
   const totalQuestions = results.reduce((sum, result) => sum + result.total_questions, 0)
@@ -31,6 +35,32 @@ export function StudentProgress({ results }: StudentProgressProps) {
     if (percentage >= 80) return "text-green-600 bg-green-100"
     if (percentage >= 60) return "text-yellow-600 bg-yellow-100"
     return "text-red-600 bg-red-100"
+  }
+
+  // 🧠 Hàm ghi điểm vào backend Supabase
+  async function recordScore(quizId: string, score: number, totalQuestions: number) {
+    try {
+      setIsSaving(true)
+      const res = await fetch("/api/student/recordScore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_id: studentId,
+          game_id: quizId,
+          score,
+          total_questions: totalQuestions,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      alert("✅ Điểm đã được lưu thành công!")
+    } catch (err: any) {
+      console.error("❌ Lỗi ghi điểm:", err.message)
+      alert("❌ Lỗi khi lưu điểm: " + err.message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -94,7 +124,10 @@ export function StudentProgress({ results }: StudentProgressProps) {
               {recentResults.map((result) => {
                 const percentage = Math.round((result.score / result.total_questions) * 100)
                 return (
-                  <div key={result.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div
+                    key={result.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                  >
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 text-balance">{result.quizzes.title}</h4>
                       <p className="text-sm text-gray-500">
@@ -109,6 +142,15 @@ export function StudentProgress({ results }: StudentProgressProps) {
                         <Progress value={percentage} className="w-20 h-2" />
                       </div>
                       <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
+                      <button
+                        onClick={() =>
+                          recordScore(result.id, result.score, result.total_questions)
+                        }
+                        disabled={isSaving}
+                        className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md"
+                      >
+                        {isSaving ? "Saving..." : "Save Score"}
+                      </button>
                     </div>
                   </div>
                 )
