@@ -14,6 +14,7 @@ interface Note {
   content: string
   created_at: string
   updated_at: string
+  user_id: string
 }
 
 interface StudentNotesProps {
@@ -27,18 +28,16 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
   const [newNote, setNewNote] = useState({ title: "", content: "" })
   const [editNote, setEditNote] = useState({ title: "", content: "" })
   const [isLoading, setIsLoading] = useState(false)
-  
+
+  const supabase = createClient()
+
   const handleCreateNote = async () => {
     if (!newNote.title.trim() || !newNote.content.trim()) return
-
     setIsLoading(true)
-    try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
 
-      if (!user) return
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) throw new Error("User not authenticated")
 
       const { error } = await supabase.from("notes").insert({
         title: newNote.title.trim(),
@@ -46,13 +45,13 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
         user_id: user.id,
       })
 
-      if (!error) {
-        setNewNote({ title: "", content: "" })
-        setIsCreating(false)
-        onNotesChange()
-      }
-    } catch (error) {
-      console.error("Error creating note:", error)
+      if (error) throw error
+
+      setNewNote({ title: "", content: "" })
+      setIsCreating(false)
+      onNotesChange()
+    } catch (err) {
+      console.error("❌ Error creating note:", err)
     } finally {
       setIsLoading(false)
     }
@@ -60,24 +59,24 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
 
   const handleUpdateNote = async (id: string) => {
     if (!editNote.title.trim() || !editNote.content.trim()) return
-
     setIsLoading(true)
+
     try {
-      const supabase = createClient()
       const { error } = await supabase
         .from("notes")
         .update({
           title: editNote.title.trim(),
           content: editNote.content.trim(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", id)
 
-      if (!error) {
-        setEditingId(null)
-        onNotesChange()
-      }
-    } catch (error) {
-      console.error("Error updating note:", error)
+      if (error) throw error
+
+      setEditingId(null)
+      onNotesChange()
+    } catch (err) {
+      console.error("❌ Error updating note:", err)
     } finally {
       setIsLoading(false)
     }
@@ -85,17 +84,14 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
 
   const handleDeleteNote = async (id: string) => {
     if (!confirm("Are you sure you want to delete this note?")) return
-
     setIsLoading(true)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from("notes").delete().eq("id", id)
 
-      if (!error) {
-        onNotesChange()
-      }
-    } catch (error) {
-      console.error("Error deleting note:", error)
+    try {
+      const { error } = await supabase.from("notes").delete().eq("id", id)
+      if (error) throw error
+      onNotesChange()
+    } catch (err) {
+      console.error("❌ Error deleting note:", err)
     } finally {
       setIsLoading(false)
     }
@@ -110,7 +106,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
     <div className="space-y-6">
       {/* Create Note Button */}
       <div className="flex justify-between items-center">
-        <p className="text-gray-600">Keep track of important information and study notes.</p>
+        <p className="text-gray-600">Keep track of important study notes.</p>
         <Button
           onClick={() => setIsCreating(true)}
           className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
@@ -153,19 +149,13 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
             <div className="flex gap-2">
               <Button
                 onClick={handleCreateNote}
-                disabled={isLoading || !newNote.title.trim() || !newNote.content.trim()}
+                disabled={isLoading}
                 className="bg-green-500 hover:bg-green-600 text-white"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Note
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreating(false)
-                  setNewNote({ title: "", content: "" })
-                }}
-              >
+              <Button variant="outline" onClick={() => setIsCreating(false)}>
                 Cancel
               </Button>
             </div>
@@ -195,7 +185,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
                       className="font-semibold"
                     />
                   ) : (
-                    <CardTitle className="text-lg text-gray-900 text-balance">{note.title}</CardTitle>
+                    <CardTitle className="text-lg text-gray-900">{note.title}</CardTitle>
                   )}
                   <div className="flex gap-1">
                     {editingId === note.id ? (
@@ -238,12 +228,12 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
                     className="min-h-24"
                   />
                 ) : (
-                  <p className="text-gray-700 text-sm leading-relaxed text-pretty">
+                  <p className="text-gray-700 text-sm leading-relaxed">
                     {note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}
                   </p>
                 )}
                 <p className="text-xs text-gray-500 mt-3">
-                  {editingId === note.id ? "Editing..." : `Updated ${new Date(note.updated_at).toLocaleDateString()}`}
+                  Updated {new Date(note.updated_at).toLocaleDateString()}
                 </p>
               </CardContent>
             </Card>
