@@ -19,16 +19,12 @@ import {
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
-interface UserStats {
+interface UserProfileData {
   id: string;
   full_name: string;
-  email: string;
+  role: string;
   points: number;
-  level: number;
-  experience: number;
-  badges: any[];
-  streak_days: number;
-  last_activity: string;
+  updated_at: string;
 }
 
 interface ActivityStats {
@@ -36,13 +32,13 @@ interface ActivityStats {
   total_quizzes_taken: number;
   total_flashcards_studied: number;
   average_score: number;
-  best_streak: number;
   total_study_time: number;
+  last_activity: string;
 }
 
 export function UserProfile() {
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [activityStats, setActivityStats] = useState<ActivityStats | null>(null);
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [activity, setActivity] = useState<ActivityStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = createBrowserClient(
@@ -51,132 +47,85 @@ export function UserProfile() {
   );
 
   useEffect(() => {
-    fetchUserProfile();
+    fetchProfileAndStats();
   }, []);
 
-  const fetchUserProfile = async () => {
+  const fetchProfileAndStats = async () => {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (userError || !user) return console.error("❌ Không có user:", userError);
 
-      // ✅ Lấy profile + user_points
-      const { data: profile, error: profileError } = await supabase
+      // ✅ Lấy dữ liệu từ bảng profiles
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select(
-          `
-          id,
-          full_name,
-          email,
-          user_points (
-            points,
-            level,
-            experience,
-            badges,
-            streak_days,
-            last_activity
-          )
-        `
-        )
+        .select("id, full_name, role, points, updated_at")
         .eq("id", user.id)
         .single();
 
       if (profileError) throw profileError;
+      setProfile(profileData);
 
-      // ✅ Hỗ trợ trường hợp Supabase trả object thay vì array
-      const userPoints = Array.isArray(profile.user_points)
-        ? profile.user_points[0]
-        : profile.user_points;
-
-      setUserStats({
-        id: profile.id,
-        full_name: profile.full_name || "Chưa cập nhật",
-        email: profile.email,
-        points: userPoints?.points ?? 0,
-        level: userPoints?.level ?? 1,
-        experience: userPoints?.experience ?? 0,
-        badges: userPoints?.badges ?? [],
-        streak_days: userPoints?.streak_days ?? 0,
-        last_activity: userPoints?.last_activity ?? new Date().toISOString(),
-      });
-
-      // ✅ Tính toán thống kê hoạt động
-      const { data: gameResults } = await supabase
-        .from("game_results")
-        .select("*")
-        .eq("user_id", user.id);
-
-      const { data: quizResults } = await supabase
+      // ✅ Lấy dữ liệu từ results, game_results, flashcards
+      const { data: results } = await supabase
         .from("results")
-        .select("*")
+        .select("score, total_questions, created_at")
         .eq("user_id", user.id);
 
-      const totalGames = gameResults?.length || 0;
-      const totalQuizzes = quizResults?.length || 0;
+      const { data: games } = await supabase
+        .from("game_results")
+        .select("score, max_score, time_taken, created_at")
+        .eq("user_id", user.id);
 
-      const avgGameScore = totalGames
-        ? gameResults.reduce((sum, r) => sum + (r.score / (r.max_score || 1)) * 100, 0) / totalGames
-        : 0;
-      const avgQuizScore = totalQuizzes
-        ? quizResults.reduce((sum, r) => sum + (r.score / (r.total_questions || 1)) * 100, 0) /
-          totalQuizzes
-        : 0;
+      const { data: flashcards } = await supabase
+        .from("flashcards")
+        .select("id")
+        .eq("created_by", user.id);
+
+      // ✅ Tính toán thống kê
+      const totalGames = games?.length || 0;
+      const totalQuizzes = results?.length || 0;
+      const totalFlashcards = flashcards?.length || 0;
+
+      const avgQuizScore =
+        totalQuizzes > 0
+          ? results.reduce((sum, r) => sum + (r.score / (r.total_questions || 1)) * 100, 0) /
+            totalQuizzes
+          : 0;
+
+      const avgGameScore =
+        totalGames > 0
+          ? games.reduce((sum, g) => sum + (g.score / (g.max_score || 1)) * 100, 0) / totalGames
+          : 0;
 
       const averageScore =
         totalGames + totalQuizzes > 0
-          ? (avgGameScore * totalGames + avgQuizScore * totalQuizzes) /
+          ? (avgQuizScore * totalQuizzes + avgGameScore * totalGames) /
             (totalGames + totalQuizzes)
           : 0;
 
       const totalStudyTime =
-        (gameResults?.reduce((sum, r) => sum + (r.time_taken || 0), 0) || 0) / 60;
+        (games?.reduce((sum, g) => sum + (g.time_taken || 0), 0) || 0) / 60;
 
-      setActivityStats({
+      const lastActivity =
+        [...(games || []), ...(results || [])]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+          ?.created_at || profileData.updated_at;
+
+      setActivity({
         total_games_played: totalGames,
         total_quizzes_taken: totalQuizzes,
-        total_flashcards_studied: 0,
+        total_flashcards_studied: totalFlashcards,
         average_score: Math.round(averageScore),
-        best_streak: userPoints?.streak_days ?? 0,
         total_study_time: Math.round(totalStudyTime),
+        last_activity: lastActivity,
       });
-    } catch (error) {
-      console.error("❌ Lỗi tải hồ sơ:", error);
+    } catch (err) {
+      console.error("❌ Lỗi tải hồ sơ:", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getNextLevelXP = (level: number) => level * 100;
-  const getCurrentLevelProgress = (exp: number, level: number) => {
-    const base = (level - 1) * 100;
-    const next = level * 100;
-    return ((exp - base) / (next - base)) * 100;
-  };
-
-  const getBadgeIcon = (type: string) => {
-    switch (type) {
-      case "level_up":
-        return <Star className="w-4 h-4" />;
-      case "streak":
-        return <TrendingUp className="w-4 h-4" />;
-      case "perfect_score":
-        return <Target className="w-4 h-4" />;
-      default:
-        return <Award className="w-4 h-4" />;
-    }
-  };
-
-  const getBadgeName = (badge: any) => {
-    switch (badge.type) {
-      case "level_up":
-        return `Lên cấp ${badge.level}`;
-      case "streak":
-        return `Chuỗi ${badge.days} ngày`;
-      case "perfect_score":
-        return "Điểm tuyệt đối";
-      default:
-        return badge.type || "Huy hiệu";
     }
   };
 
@@ -190,7 +139,7 @@ export function UserProfile() {
       </div>
     );
 
-  if (!userStats)
+  if (!profile)
     return (
       <div className="text-center py-12">
         <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -199,12 +148,6 @@ export function UserProfile() {
       </div>
     );
 
-  const levelProgress = getCurrentLevelProgress(
-    userStats.experience,
-    userStats.level
-  );
-  const nextLevelXP = getNextLevelXP(userStats.level);
-
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -212,7 +155,9 @@ export function UserProfile() {
           <User className="w-8 h-8 text-yellow-600" />
           Hồ sơ cá nhân
         </h1>
-        <p className="text-gray-600">Theo dõi tiến độ học tập và thành tích của bạn</p>
+        <p className="text-gray-600">
+          Theo dõi tiến độ học tập và thành tích của bạn
+        </p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -222,40 +167,18 @@ export function UserProfile() {
             <CardHeader className="text-center">
               <Avatar className="w-20 h-20 mx-auto mb-4">
                 <AvatarFallback className="bg-yellow-100 text-yellow-700 text-2xl">
-                  {userStats.full_name?.charAt(0) || userStats.email.charAt(0).toUpperCase()}
+                  {profile.full_name?.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <CardTitle className="text-xl">{userStats.full_name}</CardTitle>
-              <p className="text-gray-600">{userStats.email}</p>
+              <CardTitle className="text-xl">{profile.full_name}</CardTitle>
+              <p className="text-gray-600 capitalize">Vai trò: {profile.role}</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Level Progress */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
-                    Level {userStats.level}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {userStats.experience}/{nextLevelXP} XP
-                  </span>
+              <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                <div className="text-3xl font-bold text-yellow-600">
+                  {profile.points ?? 0}
                 </div>
-                <Progress value={levelProgress} className="h-2" />
-              </div>
-
-              {/* Points & Streak */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {userStats.points}
-                  </div>
-                  <div className="text-sm text-gray-600">Tổng điểm</div>
-                </div>
-                <div className="text-center p-3 bg-orange-50 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {userStats.streak_days}
-                  </div>
-                  <div className="text-sm text-gray-600">Chuỗi ngày</div>
-                </div>
+                <div className="text-sm text-gray-600">Tổng điểm</div>
               </div>
             </CardContent>
           </Card>
@@ -265,29 +188,16 @@ export function UserProfile() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Award className="w-5 h-5 text-yellow-600" />
-                <span>Huy hiệu ({userStats.badges.length})</span>
+                <span>Thành tích</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {userStats.badges.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {userStats.badges.map((badge, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      className="flex items-center space-x-1 p-2"
-                    >
-                      {getBadgeIcon(badge.type)}
-                      <span className="text-xs">{getBadgeName(badge)}</span>
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <Award className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Chưa có huy hiệu nào</p>
-                </div>
-              )}
+              <div className="text-center py-4">
+                <Award className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">
+                  Hệ thống huy hiệu sẽ hiển thị ở đây sau khi có dữ liệu
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -302,47 +212,49 @@ export function UserProfile() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {activityStats ? (
+              {activity ? (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <StatBox
                     icon={<Brain className="text-blue-600" />}
-                    value={activityStats.total_games_played}
+                    value={activity.total_games_played}
                     label="Trò chơi đã chơi"
                     color="bg-blue-50"
                   />
                   <StatBox
                     icon={<BookOpen className="text-green-600" />}
-                    value={activityStats.total_quizzes_taken}
+                    value={activity.total_quizzes_taken}
                     label="Bài kiểm tra"
                     color="bg-green-50"
                   />
                   <StatBox
                     icon={<Target className="text-purple-600" />}
-                    value={`${activityStats.average_score}%`}
+                    value={`${activity.average_score}%`}
                     label="Điểm trung bình"
                     color="bg-purple-50"
                   />
                   <StatBox
                     icon={<Zap className="text-orange-600" />}
-                    value={activityStats.best_streak}
-                    label="Chuỗi tốt nhất"
+                    value={activity.total_flashcards_studied}
+                    label="Thẻ học đã tạo"
                     color="bg-orange-50"
                   />
                   <StatBox
                     icon={<Clock className="text-indigo-600" />}
-                    value={activityStats.total_study_time}
+                    value={activity.total_study_time}
                     label="Phút học tập"
                     color="bg-indigo-50"
                   />
                   <StatBox
                     icon={<Calendar className="text-pink-600" />}
-                    value={new Date(userStats.last_activity).toLocaleDateString("vi-VN")}
+                    value={new Date(activity.last_activity).toLocaleDateString("vi-VN")}
                     label="Hoạt động cuối"
                     color="bg-pink-50"
                   />
                 </div>
               ) : (
-                <p className="text-center py-8 text-gray-600">Chưa có dữ liệu hoạt động</p>
+                <p className="text-center py-8 text-gray-600">
+                  Chưa có dữ liệu hoạt động
+                </p>
               )}
             </CardContent>
           </Card>
@@ -352,7 +264,7 @@ export function UserProfile() {
   );
 }
 
-// ✅ Component nhỏ gọn hiển thị mỗi chỉ số
+// ✅ Component hiển thị chỉ số
 function StatBox({
   icon,
   value,
