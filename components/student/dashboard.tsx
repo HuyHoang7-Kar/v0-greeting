@@ -22,14 +22,14 @@ interface Profile {
   email: string
   full_name: string
   role: string
+  avatar_url?: string
+  bio?: string
+  class_name?: string
 }
 
-interface StudentDashboardProps {
-  user: any
-  profile: Profile
-}
-
-export function StudentDashboard({ user, profile }: StudentDashboardProps) {
+export function StudentDashboard() {
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
@@ -39,43 +39,56 @@ export function StudentDashboard({ user, profile }: StudentDashboardProps) {
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
 
+  const supabase = createClient()
+
   useEffect(() => {
     loadDashboardData()
   }, [])
 
   const loadDashboardData = async () => {
     try {
-      const supabase = createClient()
+      setIsLoading(true)
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+      if (userError || !user) throw new Error("User not authenticated")
 
-      // Load flashcards
+      setUser(user)
+
+      // 🧩 Lấy profile
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+      setProfile(profileData)
+
+      // 🧩 Lấy flashcards
       const { data: flashcardsData } = await supabase
         .from("flashcards")
         .select("*")
         .order("created_at", { ascending: false })
 
-      // Load quizzes
+      // 🧩 Lấy quizzes
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
 
-      // Load user's notes
+      // 🧩 Lấy notes của user
       const { data: notesData } = await supabase
         .from("notes")
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
-      // Load user's quiz results
+      // 🧩 Lấy kết quả quiz
       const { data: resultsData } = await supabase
         .from("results")
-        .select(`
+        .select(
+          `
           *,
-          quizzes (
-            title
-          )
-        `)
+          quizzes ( title )
+        `
+        )
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false })
 
-      // Load user points
+      // 🧩 Lấy điểm user
       const { data: pointsData } = await supabase.from("user_points").select("*").eq("user_id", user.id).single()
 
       setFlashcards(flashcardsData || [])
@@ -84,20 +97,18 @@ export function StudentDashboard({ user, profile }: StudentDashboardProps) {
       setResults(resultsData || [])
       setUserPoints(pointsData)
     } catch (error) {
-      console.error("Error loading dashboard data:", error)
+      console.error("❌ Lỗi load dashboard:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleSignOut = async () => {
-    const supabase = createClient()
     await supabase.auth.signOut()
     router.push("/")
   }
 
-  const handleStudyComplete = (studyResults: { correct: number; total: number }) => {
-    // Refresh data to show updated progress
+  const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
   }
@@ -144,23 +155,20 @@ export function StudentDashboard({ user, profile }: StudentDashboardProps) {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-700">{profile.full_name || profile.email}</span>
+              <span className="text-sm text-gray-700">
+                {profile?.full_name || profile?.email || user?.email || "Người dùng"}
+              </span>
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 Học Sinh
               </Badge>
               {userPoints && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   <Medal className="w-3 h-3 mr-1" />
-                  {userPoints.total_points} điểm
+                  {userPoints.total_points || 0} điểm
                 </Badge>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="flex items-center gap-2 bg-transparent"
-            >
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2">
               <LogOut className="w-4 h-4" />
               Đăng Xuất
             </Button>
@@ -171,149 +179,77 @@ export function StudentDashboard({ user, profile }: StudentDashboardProps) {
       <div className="container mx-auto px-4 py-8">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Thẻ Học Có Sẵn</p>
-                  <p className="text-3xl font-bold text-gray-900">{flashcards.length}</p>
+          {[
+            { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" },
+            { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" },
+            { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" },
+            { label: "Điểm Tổng", value: userPoints?.total_points || 0, icon: Trophy, color: "purple" },
+          ].map(({ label, value, icon: Icon, color }, idx) => (
+            <Card
+              key={idx}
+              className={`border-2 border-${color}-200 bg-gradient-to-br from-${color}-50 to-${color}-100`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{label}</p>
+                    <p className="text-3xl font-bold text-gray-900">{value}</p>
+                  </div>
+                  <Icon className={`w-8 h-8 text-${color}-600`} />
                 </div>
-                <BookOpen className="w-8 h-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Bài Kiểm Tra</p>
-                  <p className="text-3xl font-bold text-gray-900">{quizzes.length}</p>
-                </div>
-                <Brain className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Ghi Chú Của Tôi</p>
-                  <p className="text-3xl font-bold text-gray-900">{notes.length}</p>
-                </div>
-                <FileText className="w-8 h-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Điểm Tổng</p>
-                  <p className="text-3xl font-bold text-gray-900">{userPoints?.total_points || 0}</p>
-                </div>
-                <Trophy className="w-8 h-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <Card className="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Sẵn Sàng Học Tập?</h3>
-                  <p className="text-gray-600">
-                    Bắt đầu phiên học với tất cả thẻ học có sẵn và theo dõi tiến độ của bạn.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setStudyMode(true)}
-                  disabled={flashcards.length === 0}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Bắt Đầu Học
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content Tabs */}
+        {/* Main Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 bg-white border-2 border-gray-200">
-            <TabsTrigger value="flashcards" className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4" />
-              Thẻ Học
+            <TabsTrigger value="flashcards">
+              <BookOpen className="w-4 h-4" /> Thẻ Học
             </TabsTrigger>
-            <TabsTrigger value="games" className="flex items-center gap-2">
-              <Gamepad2 className="w-4 h-4" />
-              Trò Chơi
+            <TabsTrigger value="games">
+              <Gamepad2 className="w-4 h-4" /> Trò Chơi
             </TabsTrigger>
-            <TabsTrigger value="quizzes" className="flex items-center gap-2">
-              <Brain className="w-4 h-4" />
-              Kiểm Tra
+            <TabsTrigger value="quizzes">
+              <Brain className="w-4 h-4" /> Kiểm Tra
             </TabsTrigger>
-            <TabsTrigger value="notes" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Ghi Chú
+            <TabsTrigger value="notes">
+              <FileText className="w-4 h-4" /> Ghi Chú
             </TabsTrigger>
-            <TabsTrigger value="progress" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Tiến Độ
+            <TabsTrigger value="progress">
+              <TrendingUp className="w-4 h-4" /> Tiến Độ
             </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              Xếp Hạng
+            <TabsTrigger value="leaderboard">
+              <Trophy className="w-4 h-4" /> Xếp Hạng
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="flashcards" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Thẻ Học Có Sẵn</h2>
-              {flashcards.length > 0 && (
-                <Button
-                  onClick={() => setStudyMode(true)}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Học Tất Cả
-                </Button>
-              )}
-            </div>
+          <TabsContent value="flashcards">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Thẻ Học Có Sẵn</h2>
             <FlashcardGrid flashcards={flashcards} />
           </TabsContent>
 
-          <TabsContent value="games" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Trò Chơi Học Tập</h2>
+          <TabsContent value="games">
             <GameHub />
           </TabsContent>
 
-          <TabsContent value="quizzes" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Bài Kiểm Tra</h2>
+          <TabsContent value="quizzes">
             <StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} />
           </TabsContent>
 
-          <TabsContent value="notes" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Ghi Chú Của Tôi</h2>
+          <TabsContent value="notes">
             <StudentNotes notes={notes} onNotesChange={loadDashboardData} />
           </TabsContent>
 
-          <TabsContent value="progress" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Tiến Độ Học Tập</h2>
+          <TabsContent value="progress">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <StudentProgress results={results} />
-              <UserProfile userPoints={userPoints} />
+              <UserProfile profile={profile} userPoints={userPoints} />
             </div>
           </TabsContent>
 
-          <TabsContent value="leaderboard" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Bảng Xếp Hạng</h2>
+          <TabsContent value="leaderboard">
             <Leaderboard />
           </TabsContent>
         </Tabs>
