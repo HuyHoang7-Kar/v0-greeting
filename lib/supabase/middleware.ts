@@ -10,7 +10,6 @@ export async function updateSession(request: NextRequest) {
     {
       cookies: {
         getAll() {
-đây là file middle đấy chỉnh code đi 
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
