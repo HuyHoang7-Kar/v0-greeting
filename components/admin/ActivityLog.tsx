@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/client";
 
 export default function ActivityLog() {
   const [logs, setLogs] = useState<any[]>([]);

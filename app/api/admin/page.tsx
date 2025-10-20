@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import UserList from "@/app/components/admin/UserList";
-import ActivityLog from "@/app/components/admin/ActivityLog";
+import { supabase } from "@/lib/client";
+import UserList from "@/components/admin/UserList";
+import ActivityLog from "@/components/admin/ActivityLog";
 
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null);
