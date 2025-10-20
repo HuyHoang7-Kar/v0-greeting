@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/client";
+import { supabase } from "@/lib/supabase/client";
 import UserList from "@/components/admin/UserList";
 import ActivityLog from "@/components/admin/ActivityLog";
 
