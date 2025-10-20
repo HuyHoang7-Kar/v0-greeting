@@ -14,46 +14,51 @@ export default function ActivityLog() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(false);
 
-  async function fetchLogs() {
-    setLoading(true);
-    const { data: logsData, error: logsError } = await supabase
-      .from("activity_logs")
-      .select("*")
-      .order("created_at", { ascending: false });
+  useEffect(() => {
+    async function fetchLogs() {
+      setLoading(true);
 
-    if (logsError) {
-      console.error("❌ Lỗi lấy logs:", logsError.message);
-      setLoading(false);
-      return;
-    }
+      // Lấy logs
+      const { data: logsData, error: logError } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    const userIds = logsData?.map((log) => log.user_id) || [];
-    const { data: users } = await supabase
-      .from("profiles")
-      .select("id, email")
-      .in("id", userIds);
+      if (logError) {
+        console.error("❌ Lỗi lấy logs:", logError.message);
+        setLoading(false);
+        return;
+      }
 
-    const logsWithEmail =
-      logsData?.map((log) => ({
+      // Lấy danh sách user_id để map sang email
+      const userIds = logsData.map((l) => l.user_id);
+      const { data: users, error: userError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds);
+
+      if (userError) console.error("⚠️ Lỗi lấy email:", userError.message);
+
+      const logsWithEmail = logsData.map((log) => ({
         ...log,
         email: users?.find((u) => u.id === log.user_id)?.email || "Không rõ",
-      })) || [];
+      }));
 
-    setLogs(logsWithEmail);
-    setLoading(false);
-  }
+      setLogs(logsWithEmail);
+      setLoading(false);
+    }
 
-  useEffect(() => {
     fetchLogs();
   }, []);
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">📜 Lịch sử hoạt động</h2>
+
       {loading ? (
-        <p>⏳ Đang tải dữ liệu...</p>
+        <p>⏳ Đang tải lịch sử...</p>
       ) : logs.length === 0 ? (
-        <p>⚠️ Không có hoạt động nào</p>
+        <p>⚠️ Chưa có hoạt động nào được ghi lại</p>
       ) : (
         <table className="w-full border">
           <thead>
