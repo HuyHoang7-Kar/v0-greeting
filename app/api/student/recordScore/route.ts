@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Kiểm tra biến môi trường
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn("Supabase env vars missing: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  console.warn("⚠️ Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
 }
 
+// Khởi tạo client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
   process.env.SUPABASE_SERVICE_ROLE_KEY as string
@@ -13,55 +15,46 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    // chấp nhận cả student_id hoặc user_id tên trường hợp bạn dùng khác
+
+    // Nhận dữ liệu linh hoạt (nhiều frontend khác nhau)
     const student_id = body.student_id ?? body.user_id;
     const game_id = body.game_id ?? body.quiz_id ?? body.quizId;
     const score = body.score;
-    const max_score = body.max_score ?? body.maxScore ?? body.total_questions;
-    const time_taken = body.time_taken ?? body.timeTaken ?? null;
+    const total_questions = body.total_questions ?? body.max_score ?? body.maxScore;
     const points_earned = body.points_earned ?? body.pointsEarned ?? 0;
 
-    if (!student_id || !game_id || typeof score !== "number" || typeof max_score !== "number") {
-      return NextResponse.json({ error: "Missing or invalid fields (student_id, game_id, score, max_score required)" }, { status: 400 });
+    if (!student_id || !game_id || typeof score !== "number" || typeof total_questions !== "number") {
+      return NextResponse.json(
+        { error: "Missing or invalid fields (student_id, game_id, score, total_questions required)" },
+        { status: 400 }
+      );
     }
 
-    // insert result
-    const { data, error } = await supabase
-      .from("game_results")
-      .insert([{
-        user_id: student_id,
-        game_id,
-        score,
-        max_score,
-        time_taken,
-        points_earned
-      }])
-      .select();
+    // 👉 1. Gọi hàm record_score() trong Supabase (đã tạo trong SQL script)
+    const { error: rpcError } = await supabase.rpc("record_score", {
+      p_user_id: student_id,
+      p_quiz_id: game_id,
+      p_score: score,
+      p_total_questions: total_questions,
+    });
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return NextResponse.json({ error: error.message ?? "Insert failed" }, { status: 500 });
+    if (rpcError) {
+      console.error("Supabase RPC error:", rpcError);
+      return NextResponse.json({ error: rpcError.message }, { status: 500 });
     }
 
-    // update total points in profiles (optional) via RPC
-    try {
-      if (points_earned && Number(points_earned) !== 0) {
-        const { error: rpcError } = await supabase.rpc("update_user_points", {
-          p_user_id: student_id,
-          p_points_earned: Number(points_earned)
-        });
-        if (rpcError) {
-          console.warn("RPC update_user_points warning:", rpcError);
-          // không abort nếu rpc fail; vẫn trả về success cho insert
-        }
-      }
-    } catch (rpcErr) {
-      console.warn("RPC error (ignored):", rpcErr);
+    // 👉 2. (Tuỳ chọn) Cộng điểm thủ công vào user_points nếu có `points_earned`
+    if (points_earned && Number(points_earned) > 0) {
+      const { error: updateError } = await supabase.rpc("update_user_points", {
+        p_user_id: student_id,
+        p_points_earned: Number(points_earned),
+      });
+      if (updateError) console.warn("update_user_points warning:", updateError.message);
     }
 
-    return NextResponse.json({ success: true, data }, { status: 200 });
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (err: any) {
-    console.error("Route POST /api/student/recordScore error:", err);
+    console.error("❌ Route POST /api/student/recordScore error:", err);
     return NextResponse.json({ error: err.message ?? String(err) }, { status: 500 });
   }
 }
