@@ -2,40 +2,72 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+}
+
 export default function UserList() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("student");
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
   async function fetchUsers() {
-    const { data, error } = await supabase.from("users").select("*");
-    if (error) console.error(error);
-    else setUsers(data);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, email, role, created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) console.error("❌ Lỗi lấy danh sách:", error);
+    else setUsers(data || []);
   }
 
   async function deleteUser(id: string) {
-    await supabase.from("users").delete().eq("id", id);
-    fetchUsers();
+    const { error } = await supabase.from("profiles").delete().eq("id", id);
+    if (error) alert("❌ Lỗi xóa người dùng: " + error.message);
+    else fetchUsers();
   }
 
   async function createUser() {
-    if (!newEmail || !newPassword) return alert("Nhập email và mật khẩu!");
+    if (!newEmail || !newPassword)
+      return alert("⚠️ Vui lòng nhập email và mật khẩu!");
 
-    const { error } = await supabase.auth.signUp({
+    // 1️⃣ Tạo tài khoản Supabase auth
+    const { data, error } = await supabase.auth.signUp({
       email: newEmail,
       password: newPassword,
     });
 
-    if (error) alert("Lỗi tạo tài khoản: " + error.message);
-    else {
-      alert("✅ Đã tạo tài khoản!");
-      setNewEmail("");
-      setNewPassword("");
-      fetchUsers();
+    if (error) {
+      alert("❌ Lỗi tạo tài khoản: " + error.message);
+      return;
+    }
+
+    // 2️⃣ Thêm thông tin vào bảng profiles
+    const user = data.user;
+    if (user) {
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: user.id,
+        email: newEmail,
+        role: newRole,
+        created_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
+        alert("⚠️ Lỗi khi thêm profile: " + profileError.message);
+      } else {
+        alert("✅ Tạo tài khoản thành công!");
+        setNewEmail("");
+        setNewPassword("");
+        fetchUsers();
+      }
     }
   }
 
@@ -57,6 +89,15 @@ export default function UserList() {
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
+        <select
+          className="border p-2 rounded"
+          value={newRole}
+          onChange={(e) => setNewRole(e.target.value)}
+        >
+          <option value="student">Học sinh</option>
+          <option value="teacher">Giáo viên</option>
+          <option value="admin">Admin</option>
+        </select>
         <button
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 rounded"
           onClick={createUser}
