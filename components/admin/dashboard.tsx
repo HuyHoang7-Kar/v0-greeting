@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 
-// ✅ Dùng dynamic import để tránh SSR lỗi với Supabase client
+// ✅ Dùng dynamic import để tránh lỗi SSR khi có Supabase hoặc useEffect
 const UserList = dynamic(() => import("@/components/admin/UserList"), {
   ssr: false,
   loading: () => <p>⏳ Đang tải danh sách người dùng...</p>,
@@ -14,7 +14,8 @@ const ActivityLog = dynamic(() => import("@/components/admin/ActivityLog"), {
   loading: () => <p>⏳ Đang tải lịch sử hoạt động...</p>,
 });
 
-export default function AdminPage() {
+// 🧩 Export theo tên để có thể import { AdminDashboard }
+export function AdminDashboard() {
   const [tab, setTab] = useState<"users" | "logs">("users");
 
   return (
