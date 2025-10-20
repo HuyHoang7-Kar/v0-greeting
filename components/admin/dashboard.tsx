@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 
-// 🧩 Dynamic import tránh SSR lỗi khi trong component có useEffect hoặc Supabase client
+// ✅ Dùng dynamic import để tránh SSR lỗi với Supabase client
 const UserList = dynamic(() => import("@/components/admin/UserList"), {
   ssr: false,
   loading: () => <p>⏳ Đang tải danh sách người dùng...</p>,

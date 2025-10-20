@@ -1,6 +1,7 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 interface Log {
   id: string;
@@ -11,33 +12,30 @@ interface Log {
 }
 
 export default function ActivityLog() {
+  const supabase = createClient(); // ✅ tạo instance client
   const [logs, setLogs] = useState<Log[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchLogs() {
-      setLoading(true);
-
-      // Lấy logs
-      const { data: logsData, error: logError } = await supabase
+      // Lấy danh sách logs
+      const { data: logsData, error } = await supabase
         .from("activity_logs")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (logError) {
-        console.error("❌ Lỗi lấy logs:", logError.message);
+      if (error || !logsData) {
+        console.error("❌ Lỗi lấy logs:", error?.message);
         setLoading(false);
         return;
       }
 
-      // Lấy danh sách user_id để map sang email
-      const userIds = logsData.map((l) => l.user_id);
-      const { data: users, error: userError } = await supabase
+      // Lấy email người dùng
+      const userIds = logsData.map((log) => log.user_id);
+      const { data: users } = await supabase
         .from("profiles")
         .select("id, email")
         .in("id", userIds);
-
-      if (userError) console.error("⚠️ Lỗi lấy email:", userError.message);
 
       const logsWithEmail = logsData.map((log) => ({
         ...log,
@@ -54,11 +52,10 @@ export default function ActivityLog() {
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-4">📜 Lịch sử hoạt động</h2>
-
       {loading ? (
-        <p>⏳ Đang tải lịch sử...</p>
+        <p>⏳ Đang tải...</p>
       ) : logs.length === 0 ? (
-        <p>⚠️ Chưa có hoạt động nào được ghi lại</p>
+        <p>⚠️ Chưa có hoạt động nào.</p>
       ) : (
         <table className="w-full border">
           <thead>
