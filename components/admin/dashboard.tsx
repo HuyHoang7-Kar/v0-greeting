@@ -1,18 +1,31 @@
 "use client"
 
-import React from "react"
-import Link from "next/link"
+import React, { useState } from "react"
+import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { LogOut } from "lucide-react"
+import ActiveUser from "./ActiveUser"
+import UserManagement from "./UserManagement" // nếu có sau này
 
 export function AdminDashboard({ user, profile }) {
   const router = useRouter()
   const supabase = createClient()
+  const [activeTab, setActiveTab] = useState<"users" | "activity">("users")
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push("/auth/login")
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "users":
+        return <UserManagement /> // hoặc component quản lý user nếu có
+      case "activity":
+        return <ActiveUser />
+      default:
+        return null
+    }
   }
 
   return (
@@ -20,9 +33,7 @@ export function AdminDashboard({ user, profile }) {
       <header className="flex items-center justify-between bg-white shadow px-6 py-4">
         <h1 className="text-2xl font-bold text-indigo-600">👑 Bảng điều khiển Admin</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
-            {profile.email || user.email}
-          </span>
+          <span className="text-sm text-gray-600">{profile.email || user.email}</span>
           <button
             onClick={handleLogout}
             className="flex items-center gap-1 text-red-500 hover:text-red-700"
@@ -32,32 +43,35 @@ export function AdminDashboard({ user, profile }) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto mt-8 p-6 bg-white rounded-2xl shadow">
+      <main className="max-w-5xl mx-auto mt-8 p-6 bg-white rounded-2xl shadow">
         <h2 className="text-xl font-semibold mb-6">Chức năng quản trị</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Quản lý tài khoản */}
-          <Link
-            href="/admin/users"
-            className="p-6 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-2xl shadow-sm transition"
+        {/* Tabs chức năng */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`px-4 py-2 rounded-xl font-medium ${
+              activeTab === "users"
+                ? "bg-indigo-600 text-white"
+                : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            }`}
           >
-            <h3 className="text-lg font-semibold text-indigo-700 mb-2">👥 Quản lý tài khoản</h3>
-            <p className="text-sm text-gray-600">
-              Tạo, chỉnh sửa hoặc xóa tài khoản người dùng trong hệ thống.
-            </p>
-          </Link>
-
-          {/* Lịch sử hoạt động */}
-          <Link
-            href="/admin/activity"
-            className="p-6 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-2xl shadow-sm transition"
+            👥 Quản lý tài khoản
+          </button>
+          <button
+            onClick={() => setActiveTab("activity")}
+            className={`px-4 py-2 rounded-xl font-medium ${
+              activeTab === "activity"
+                ? "bg-amber-600 text-white"
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
           >
-            <h3 className="text-lg font-semibold text-amber-700 mb-2">📜 Lịch sử hoạt động</h3>
-            <p className="text-sm text-gray-600">
-              Theo dõi lịch sử đăng nhập và hành động của các tài khoản.
-            </p>
-          </Link>
+            📜 Lịch sử hoạt động
+          </button>
         </div>
+
+        {/* Nội dung tab */}
+        <div>{renderContent()}</div>
 
         <div className="mt-10 text-center text-gray-500 text-sm">
           Hệ thống quản trị © {new Date().getFullYear()}
