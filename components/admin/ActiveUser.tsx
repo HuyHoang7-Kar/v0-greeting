@@ -23,15 +23,11 @@ export default function ActiveUser() {
           .from("profiles")
           .select("id, email, role, created_at, updated_at")
           .order("created_at", { ascending: false })
-          .limit(50) // lấy 50 bản ghi mới nhất
 
-        if (error) {
-          console.error("Lỗi lấy dữ liệu profiles:", error.message)
-        } else if (data) {
-          setUsers(data)
-        }
+        if (error) console.error("Lỗi fetch profiles:", error.message)
+        else if (data) setUsers(data)
       } catch (err) {
-        console.error("Lỗi fetch profiles:", err)
+        console.error("Lỗi fetch:", err)
       } finally {
         setLoading(false)
       }
@@ -39,6 +35,8 @@ export default function ActiveUser() {
 
     fetchProfiles()
   }, [])
+
+  console.log(users) // debug dữ liệu
 
   if (loading) return <div>Loading...</div>
   if (!users.length) return <div>Chưa có dữ liệu profile nào.</div>
@@ -60,12 +58,8 @@ export default function ActiveUser() {
             <tr key={user.id}>
               <td className="border px-3 py-1">{user.email}</td>
               <td className="border px-3 py-1">{user.role}</td>
-              <td className="border px-3 py-1">
-                {new Date(user.created_at).toLocaleString()}
-              </td>
-              <td className="border px-3 py-1">
-                {new Date(user.updated_at).toLocaleString()}
-              </td>
+              <td className="border px-3 py-1">{new Date(user.created_at).toLocaleString()}</td>
+              <td className="border px-3 py-1">{new Date(user.updated_at).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
