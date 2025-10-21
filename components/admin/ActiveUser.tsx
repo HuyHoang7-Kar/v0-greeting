@@ -3,63 +3,68 @@
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-interface LoginRecord {
+interface UserProfile {
   id: string
-  user_id: string
   email: string
-  login_at: string
+  role: string
+  created_at: string
+  updated_at: string
 }
 
 export default function ActiveUser() {
   const supabase = createClientComponentClient()
-  const [logins, setLogins] = useState<LoginRecord[]>([])
+  const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchLogins = async () => {
+    const fetchProfiles = async () => {
       try {
         const { data, error } = await supabase
-          .from("login_history")
-          .select("*")
-          .order("login_at", { ascending: false })
-          .limit(50) // lấy 50 bản ghi gần nhất
+          .from("profiles")
+          .select("id, email, role, created_at, updated_at")
+          .order("created_at", { ascending: false })
+          .limit(50) // lấy 50 bản ghi mới nhất
 
         if (error) {
-          console.error("Lỗi lấy lịch sử đăng nhập:", error.message)
+          console.error("Lỗi lấy dữ liệu profiles:", error.message)
         } else if (data) {
-          setLogins(data)
+          setUsers(data)
         }
       } catch (err) {
-        console.error("Lỗi fetch login history:", err)
+        console.error("Lỗi fetch profiles:", err)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchLogins()
+    fetchProfiles()
   }, [])
 
   if (loading) return <div>Loading...</div>
-  if (!logins.length) return <div>Chưa có dữ liệu lịch sử đăng nhập nào.</div>
+  if (!users.length) return <div>Chưa có dữ liệu profile nào.</div>
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4">📜 Lịch sử đăng nhập</h2>
+      <h2 className="text-lg font-semibold mb-4">📜 Thông tin người dùng</h2>
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100">
             <th className="border px-3 py-1">Email</th>
-            <th className="border px-3 py-1">User ID</th>
-            <th className="border px-3 py-1">Login At</th>
+            <th className="border px-3 py-1">Role</th>
+            <th className="border px-3 py-1">Created At</th>
+            <th className="border px-3 py-1">Updated At</th>
           </tr>
         </thead>
         <tbody>
-          {logins.map((login) => (
-            <tr key={login.id}>
-              <td className="border px-3 py-1">{login.email}</td>
-              <td className="border px-3 py-1">{login.user_id}</td>
+          {users.map((user) => (
+            <tr key={user.id}>
+              <td className="border px-3 py-1">{user.email}</td>
+              <td className="border px-3 py-1">{user.role}</td>
               <td className="border px-3 py-1">
-                {new Date(login.login_at).toLocaleString()}
+                {new Date(user.created_at).toLocaleString()}
+              </td>
+              <td className="border px-3 py-1">
+                {new Date(user.updated_at).toLocaleString()}
               </td>
             </tr>
           ))}
