@@ -148,8 +148,16 @@ export function GameHub() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   )
 
-  // ✅ fallback khi Supabase rỗng
+  // ✅ Fallback khi Supabase rỗng
   const fallbackGames: Game[] = [
+    {
+      id: "math-calculator-1",
+      name: "Máy tính Toán học",
+      description: "Giải toán bằng máy tính ảo – luyện phản xạ tính toán nhanh!",
+      type: "math_calculator",
+      category: "math",
+      difficulty: "medium",
+    },
     {
       id: "platformer-math-1",
       name: "Mario Toán Học",
@@ -161,6 +169,11 @@ export function GameHub() {
   ]
 
   const fallbackQuestions: { [key: string]: GameQuestion[] } = {
+    "math-calculator-1": [
+      { id: "1", question: "12 + 5 = ?", correct_answer: "17", options: [], points: 10 },
+      { id: "2", question: "7 × 3 = ?", correct_answer: "21", options: [], points: 10 },
+      { id: "3", question: "15 - 8 = ?", correct_answer: "7", options: [], points: 10 },
+    ],
     "platformer-math-1": [
       { id: "1", question: "5 + 2 = ?", correct_answer: "7", options: ["6", "7", "8", "9"], points: 10 },
       { id: "2", question: "9 - 3 = ?", correct_answer: "6", options: ["5", "6", "7", "8"], points: 10 },
@@ -168,7 +181,6 @@ export function GameHub() {
     ],
   }
 
-  // 🧠 Load game list
   useEffect(() => {
     fetchGames()
   }, [])
@@ -207,13 +219,11 @@ export function GameHub() {
     }
   }
 
-  // 🎮 Khi chọn game
   const handleGameSelect = async (game: Game) => {
     setSelectedGame(game)
     await fetchGameQuestions(game.id)
   }
 
-  // 💾 Khi hoàn thành game
   const handleGameComplete = async (
     score: number,
     maxScore: number,
@@ -235,7 +245,6 @@ export function GameHub() {
         points_earned: pointsEarned,
       })
 
-      // Gọi hàm cập nhật tổng điểm (tùy bạn có function update_user_points không)
       await supabase.rpc("update_user_points", {
         p_user_id: user.id,
         p_points_earned: pointsEarned,
@@ -250,13 +259,11 @@ export function GameHub() {
     setGameQuestions([])
   }
 
-  // 🔍 Lọc category
   const filteredGames =
     selectedCategory === "all"
       ? games
       : games.filter((g) => g.category === selectedCategory)
 
-  // 🕓 Loading
   if (loading)
     return (
       <div className="flex items-center justify-center py-12 text-gray-600">
@@ -267,7 +274,6 @@ export function GameHub() {
       </div>
     )
 
-  // 🎮 Nếu đang chơi 1 game
   if (selectedGame && gameQuestions.length > 0) {
     const GameComponent =
       {
@@ -301,7 +307,6 @@ export function GameHub() {
           </Badge>
         </div>
 
-        {/* Truyền props để game Mario hoạt động */}
         <GameComponent
           gameId={selectedGame.id}
           questions={gameQuestions}
@@ -311,7 +316,6 @@ export function GameHub() {
     )
   }
 
-  // 🧩 Giao diện danh sách game
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
