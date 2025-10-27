@@ -108,87 +108,118 @@ export default function CreateQuizForm() {
   }
 
   // Nếu quiz chưa tạo, hiển thị form tạo quiz
-  if (!quizId) {
     return (
-      <Card className="border-2 border-yellow-200 bg-yellow-50 p-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            Create New Quiz
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && <p className="text-red-600">{error}</p>}
-          <Input placeholder="Quiz title" value={title} onChange={(e)=>setTitle(e.target.value)} />
-          <Textarea placeholder="Quiz description" value={description} onChange={(e)=>setDescription(e.target.value)} className="min-h-24" />
-          <Button onClick={handleCreateQuiz} disabled={isLoading} className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2">
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
-            Create Quiz
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Nếu quiz đã tạo, hiển thị thêm câu hỏi
-  return (
     <div className="space-y-4">
-      <Card className="border-2 border-green-200 bg-green-50 p-4">
-        <CardHeader>
-          <CardTitle>Quiz Created! Add Questions Below</CardTitle>
-        </CardHeader>
-      </Card>
-
-      <Card className="border-2 border-blue-200 p-4 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="w-5 h-5" /> Add Question
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {questionError && <p className="text-red-600">{questionError}</p>}
-          <Textarea
-            placeholder="Question"
-            value={newQuestion.question}
-            onChange={(e)=>setNewQuestion({...newQuestion, question:e.target.value})}
-          />
-          {["a","b","c","d"].map(opt => (
+      {!quizId ? (
+        <Card className="border-2 border-yellow-200 bg-yellow-50 p-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Create New Quiz
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {error && <p className="text-red-600">{error}</p>}
             <Input
-              key={opt}
-              placeholder={`Option ${opt.toUpperCase()}`}
-              value={newQuestion[`option_${opt}` as keyof typeof newQuestion]}
-              onChange={(e)=>setNewQuestion({...newQuestion, [`option_${opt}`]: e.target.value})}
+              placeholder="Quiz title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
-          ))}
-          <Select value={newQuestion.correct_answer} onValueChange={(v)=>setNewQuestion({...newQuestion, correct_answer:v as "A"|"B"|"C"|"D"})}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["A","B","C","D"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <div className="flex gap-2 mt-2">
-            <Button onClick={handleAddQuestion} disabled={questionLoading} className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2">
-              <Save className="w-4 h-4"/> Add
+            <Textarea
+              placeholder="Quiz description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-24"
+            />
+            <Button
+              onClick={handleCreateQuiz}
+              disabled={isLoading}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              Create Quiz
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-2">
-        {questionLoading && <p>Loading questions...</p>}
-        {questions.map((q, idx)=>(
-          <Card key={q.id} className="p-2 border-2">
-            <p className="font-medium">Q{idx+1}: {q.question}</p>
-            <ul className="ml-4">
-              <li>A: {q.option_a}</li>
-              <li>B: {q.option_b}</li>
-              <li>C: {q.option_c}</li>
-              <li>D: {q.option_d}</li>
-              <li className="text-green-700">Correct: {q.correct_answer}</li>
-            </ul>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card className="border-2 border-blue-200 p-4 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="w-5 h-5" /> Add Question
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {questionError && <p className="text-red-600">{questionError}</p>}
+              <Textarea
+                placeholder="Question"
+                value={newQuestion.question}
+                onChange={(e) =>
+                  setNewQuestion({ ...newQuestion, question: e.target.value })
+                }
+              />
+              {["a", "b", "c", "d"].map((opt) => (
+                <Input
+                  key={opt}
+                  placeholder={`Option ${opt.toUpperCase()}`}
+                  value={newQuestion[`option_${opt}` as keyof typeof newQuestion]}
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      [`option_${opt}`]: e.target.value,
+                    })
+                  }
+                />
+              ))}
+              <Select
+                value={newQuestion.correct_answer}
+                onValueChange={(v) =>
+                  setNewQuestion({ ...newQuestion, correct_answer: v as "A" | "B" | "C" | "D" })
+                }
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["A", "B", "C", "D"].map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  onClick={handleAddQuestion}
+                  disabled={questionLoading}
+                  className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" /> Add
+                </Button>
+              </div>
+            </CardContent>
           </Card>
-        ))}
-      </div>
+
+          <div className="space-y-2">
+            {questionLoading && <p>Loading questions...</p>}
+            {questions.map((q, idx) => (
+              <Card key={q.id} className="p-2 border-2">
+                <p className="font-medium">Q{idx + 1}: {q.question}</p>
+                <ul className="ml-4">
+                  <li>A: {q.option_a}</li>
+                  <li>B: {q.option_b}</li>
+                  <li>C: {q.option_c}</li>
+                  <li>D: {q.option_d}</li>
+                  <li className="text-green-700">Correct: {q.correct_answer}</li>
+                </ul>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
-}
