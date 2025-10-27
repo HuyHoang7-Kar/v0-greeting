@@ -51,7 +51,6 @@ export default function CreateQuizForm() {
           title: "Untitled Quiz",
           description: "Auto-created quiz",
           created_by: user.id,
-          teacher_id: user.id,
         })
         .select()
         .single()
