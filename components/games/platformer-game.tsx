@@ -7,37 +7,33 @@ import { Button } from "@/components/ui/button"
 
 interface Props {
   gameId?: string
-  onGameComplete?: (score: number, maxScore?: number, timeTaken?: number, pointsEarned?: number) => void
+  onGameComplete?: (score: number) => void
 }
 
 export function PlatformerGame({ gameId, onGameComplete }: Props) {
   const canvasId = useRef(`platformer-canvas-${Math.random().toString(36).slice(2, 9)}`)
-  const [lastScore, setLastScore] = useState<number>(0)
-  const [running, setRunning] = useState(true)
+  const [lastScore, setLastScore] = useState(0)
   const supabase = createClient()
   const destroyRef = useRef<() => void>(() => {})
-  const animationRef = useRef<number | null>(null)
-  const spriteRef = useRef<HTMLImageElement | null>(null)
-
-  // Load Mario sprite
-  useEffect(() => {
-    const img = new Image()
-    img.src = "/sprites/mario.png" // đường dẫn Mario
-    spriteRef.current = img
-  }, [])
 
   useEffect(() => {
+    const marioImg = new Image()
+    marioImg.src = "/sprites/mario.png"
+
+    const blockImg = new Image()
+    blockImg.src = "/sprites/block.png"
+
     const { destroy } = initPlatformer(canvasId.current, {
       width: 820,
       height: 360,
-      sprite: spriteRef.current || undefined,
+      sprite: marioImg,
+      block: blockImg,
       onScore: async (score: number) => {
         setLastScore(score)
         try {
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
 
-          // Lưu điểm ngay khi trả lời đúng
           await supabase.from("game_results").upsert({
             user_id: user.id,
             game_id: gameId || "platformer-math",
@@ -47,48 +43,17 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
             points_earned: score,
           }, { onConflict: ["user_id", "game_id"] })
 
-          const { error: rpcErr } = await supabase.rpc("update_user_points", {
-            p_user_id: user.id,
-            p_points_earned: score,
-          }).catch(() => ({ error: true }))
-
-          if (rpcErr) {
-            await supabase.from("user_points").upsert({
-              user_id: user.id,
-              points: score,
-            }, { onConflict: "user_id" })
-          }
-
-          onGameComplete?.(score, score, 0, score)
+          onGameComplete?.(score)
         } catch (err) {
           console.error("Error saving score:", err)
         }
       },
-      onError: (err) => {
-        console.error("Platformer error:", err)
-      },
+      onError: (err) => console.error(err),
     })
 
     destroyRef.current = destroy
-
-    return () => {
-      destroy()
-      destroyPlatformer()
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-    }
+    return () => destroy()
   }, [gameId, onGameComplete, supabase])
-
-  // Pause / Resume animation
-  const toggleRunning = () => {
-    setRunning(v => !v)
-    if (!running) {
-      // Resume: restart animation frame loop
-      animationRef.current = requestAnimationFrame(() => {})
-    } else {
-      // Pause
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-    }
-  }
 
   return (
     <div className="flex flex-col items-center space-y-3">
@@ -97,8 +62,8 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button onClick={toggleRunning}>
-          {running ? "⏸️ Tạm dừng" : "▶️ Tiếp tục"}
+        <Button onClick={() => destroyPlatformer()}>
+          ⏸️ Tạm dừng
         </Button>
 
         <Button variant="ghost" onClick={async () => {

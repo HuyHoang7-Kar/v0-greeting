@@ -9,9 +9,10 @@ type InitOpts = {
   height?: number
   level?: "easy" | "medium" | "hard"
   questions?: Question[]
+  sprite?: HTMLImageElement
+  block?: HTMLImageElement
   onScore?: (score: number) => void
   onError?: (err: Error) => void
-  sprite?: HTMLImageElement // sprite Mario
 }
 
 let _animationId: number | null = null
@@ -40,7 +41,6 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
     destroyPlatformer()
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null
     if (!canvas) throw new Error(`Canvas not found: ${canvasId}`)
-
     _canvas = canvas
     const ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("No 2D context")
@@ -49,7 +49,6 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
     canvas.width = opts.width || 820
     canvas.height = opts.height || 360
 
-    // ======= Setup base =======
     const groundY = 280
     const player = { x: 60, y: groundY - 48, w: 32, h: 48, vy: 0, jumping: false }
     const gravity = 0.9
@@ -58,12 +57,23 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
     let showQuestion = false
     let selectedAnswer: string | null = null
 
-    const questions: Question[] = opts.questions || [
-      { question: "3 + 2 = ?", correct_answer: "5", options: ["4", "5", "6", "7"] },
-      { question: "7 - 5 = ?", correct_answer: "2", options: ["1", "2", "3", "4"] },
-    ]
+    const baseQuestions: Record<string, Question[]> = {
+      easy: [
+        { question: "3 + 2 = ?", correct_answer: "5", options: ["4", "5", "6", "7"] },
+        { question: "7 - 5 = ?", correct_answer: "2", options: ["1", "2", "3", "4"] },
+      ],
+      medium: [
+        { question: "6 × 2 = ?", correct_answer: "12", options: ["10", "11", "12", "13"] },
+        { question: "9 ÷ 3 = ?", correct_answer: "3", options: ["2", "3", "4", "5"] },
+      ],
+      hard: [
+        { question: "15 ÷ (3 + 2) = ?", correct_answer: "3", options: ["2", "3", "4", "5"] },
+        { question: "√81 = ?", correct_answer: "9", options: ["7", "8", "9", "10"] },
+      ],
+    }
 
-    // ======= Events =======
+    const questions = opts.questions || baseQuestions[opts.level || "easy"]
+
     window.addEventListener("keydown", _handleKeyDown)
     window.addEventListener("keyup", _handleKeyUp)
 
@@ -76,25 +86,44 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
 
       if (selectedAnswer === q.correct_answer) {
         score += 10
-        opts.onScore?.(score)
+        opts.onScore?.(score)  // Lưu điểm ngay khi trả lời đúng
       }
-
       currentQuestion++
       selectedAnswer = null
       showQuestion = false
     }
     window.addEventListener("keydown", _handleQuestionInput)
 
-    // ======= HUD =======
     function drawHUD() {
       if (!_ctx) return
-      _ctx.fillStyle = "#e2e8f0"
+      _ctx.fillStyle = "#fff"
       _ctx.font = "18px monospace"
       _ctx.fillText(`Score: ${score}`, 12, 24)
       _ctx.fillText(`Q: ${currentQuestion + 1}/${questions.length}`, 12, 48)
     }
 
-    // ======= Draw question =======
+    function drawPlayer() {
+      if (!_ctx) return
+      if (opts.sprite && opts.sprite.complete) {
+        _ctx.drawImage(opts.sprite, player.x, player.y, player.w, player.h)
+      } else {
+        _ctx.fillStyle = "#facc15"
+        _ctx.fillRect(player.x, player.y, player.w, player.h)
+      }
+    }
+
+    function drawPlatform() {
+      if (!_ctx) return
+      if (opts.block && opts.block.complete) {
+        for (let x = 0; x < canvas.width; x += 32) {
+          _ctx.drawImage(opts.block, x, groundY, 32, 32)
+        }
+      } else {
+        _ctx.fillStyle = "#334155"
+        _ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY)
+      }
+    }
+
     function drawQuestion(q: Question) {
       if (!_ctx) return
       const ctx = _ctx
@@ -111,7 +140,6 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       ctx.fillText("→ Nhấn phím số 1-4 để chọn đáp án", 120, 250)
     }
 
-    // ======= Update =======
     function update() {
       if (showQuestion) return
       if (_keys["ArrowLeft"] || _keys["a"]) player.x -= 4
@@ -129,11 +157,9 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
         player.jumping = false
       }
 
-      // Giới hạn biên
       if (player.x < 0) player.x = 0
       if (player.x + player.w > canvas.width) player.x = canvas.width - player.w
 
-      // Hiển thị câu hỏi
       if (player.x + player.w > canvas.width - 80) {
         if (currentQuestion < questions.length) {
           showQuestion = true
@@ -145,30 +171,18 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       }
     }
 
-    // ======= Draw =======
     function draw() {
       if (!_ctx) return
-      const ctx = _ctx
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.fillStyle = "#0f172a"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.fillStyle = "#334155"
-      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY)
-
-      // Vẽ nhân vật Mario
-      if (opts.sprite && opts.sprite.complete) {
-        ctx.drawImage(opts.sprite, player.x, player.y, player.w, player.h)
-      } else {
-        ctx.fillStyle = "#facc15"
-        ctx.fillRect(player.x, player.y, player.w, player.h)
-      }
-
+      _ctx.clearRect(0, 0, canvas.width, canvas.height)
+      _ctx.fillStyle = "#87CEEB"
+      _ctx.fillRect(0, 0, canvas.width, canvas.height)
+      drawPlatform()
+      drawPlayer()
       drawHUD()
       if (showQuestion && currentQuestion < questions.length)
         drawQuestion(questions[currentQuestion])
     }
 
-    // ======= Loop =======
     function loop() {
       try {
         update()
