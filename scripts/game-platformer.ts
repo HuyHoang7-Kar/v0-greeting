@@ -1,12 +1,11 @@
 // /scripts/game-platformer.ts
-// Lightweight platformer engine suitable for embedding in React components.
-// Exports initPlatformer(canvasId, opts) so React can call it inside useEffect.
 
 type InitOpts = {
   width?: number
   height?: number
   onScore?: (score: number) => void
   onError?: (err: Error) => void
+  questions?: { question: string; correct_answer: string; options: string[] }[]
 }
 
 let _animationId: number | null = null
@@ -15,78 +14,72 @@ let _ctx: CanvasRenderingContext2D | null = null
 
 export function destroyPlatformer() {
   if (typeof window === "undefined") return
-  if (_animationId) {
-    cancelAnimationFrame(_animationId)
-    _animationId = null
-  }
+  if (_animationId) cancelAnimationFrame(_animationId)
   window.removeEventListener("keydown", _handleKeyDown)
   window.removeEventListener("keyup", _handleKeyUp)
+  _animationId = null
   _canvas = null
   _ctx = null
 }
 
 let _keys: Record<string, boolean> = {}
-function _handleKeyDown(e: KeyboardEvent) {
-  _keys[e.key] = true
-}
-function _handleKeyUp(e: KeyboardEvent) {
-  _keys[e.key] = false
-}
+function _handleKeyDown(e: KeyboardEvent) { _keys[e.key] = true }
+function _handleKeyUp(e: KeyboardEvent) { _keys[e.key] = false }
 
 export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
   try {
-    if (typeof window === "undefined") {
-      throw new Error("Platformer must be initialized on the client")
-    }
-
-    destroyPlatformer() // ensure clean start
-
+    destroyPlatformer()
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null
-    if (!canvas) throw new Error(`Canvas element not found: ${canvasId}`)
+    if (!canvas) throw new Error(`Canvas not found: ${canvasId}`)
     _canvas = canvas
     const ctx = canvas.getContext("2d")
-    if (!ctx) throw new Error("Cannot get 2D context")
+    if (!ctx) throw new Error("No 2D context")
     _ctx = ctx
 
-    canvas.width = opts.width || 800
-    canvas.height = opts.height || 380
+    canvas.width = opts.width || 820
+    canvas.height = opts.height || 360
 
-    // Simple player + world state
-    const player = { x: 60, y: 240, w: 32, h: 32, vy: 0, jumping: false }
     const groundY = 280
+    const player = { x: 60, y: groundY - 32, w: 32, h: 32, vy: 0, jumping: false }
     const gravity = 0.9
     let score = 0
-    let tick = 0
+    let currentQuestion = 0
+    let showQuestion = false
+    let selectedAnswer: string | null = null
 
-    _keys = {}
+    const questions = opts.questions || [
+      { question: "5 + 3 = ?", correct_answer: "8", options: ["6", "7", "8", "9"] },
+      { question: "9 - 4 = ?", correct_answer: "5", options: ["5", "6", "7", "8"] },
+      { question: "6 × 2 = ?", correct_answer: "12", options: ["8", "10", "12", "14"] },
+    ]
+
     window.addEventListener("keydown", _handleKeyDown)
     window.addEventListener("keyup", _handleKeyUp)
 
-    function draw() {
-      if (!_ctx || !_canvas) return
+    function drawHUD() {
+      if (!_ctx) return
+      _ctx.fillStyle = "#e2e8f0"
+      _ctx.font = "18px monospace"
+      _ctx.fillText(`Score: ${score}`, 12, 24)
+      _ctx.fillText(`Q: ${currentQuestion + 1}/${questions.length}`, 12, 48)
+    }
+
+    function drawQuestion(q: any) {
+      if (!_ctx) return
       const ctx = _ctx
-      ctx.clearRect(0, 0, _canvas.width, _canvas.height)
-
-      // background (retro pixel-ish)
-      ctx.fillStyle = "#0f172a"
-      ctx.fillRect(0, 0, _canvas.width, _canvas.height)
-
-      // ground
-      ctx.fillStyle = "#334155"
-      ctx.fillRect(0, groundY, _canvas.width, _canvas.height - groundY)
-
-      // player (pixel block)
-      ctx.fillStyle = "#f59e0b"
-      ctx.fillRect(player.x, player.y, player.w, player.h)
-
-      // HUD
-      ctx.fillStyle = "#e2e8f0"
-      ctx.font = "18px monospace"
-      ctx.fillText(`Score: ${score}`, 12, 26)
+      ctx.fillStyle = "rgba(0,0,0,0.7)"
+      ctx.fillRect(100, 80, 620, 200)
+      ctx.fillStyle = "#fff"
+      ctx.font = "20px sans-serif"
+      ctx.fillText(q.question, 120, 120)
+      q.options.forEach((opt: string, i: number) => {
+        ctx.fillStyle = (selectedAnswer === opt ? "#f59e0b" : "#fff")
+        ctx.fillText(`${i + 1}. ${opt}`, 140, 160 + i * 30)
+      })
     }
 
     function update() {
-      // input
+      if (showQuestion) return
       if (_keys["ArrowLeft"] || _keys["a"]) player.x -= 4
       if (_keys["ArrowRight"] || _keys["d"]) player.x += 4
       if ((_keys[" "] || _keys["ArrowUp"] || _keys["w"]) && !player.jumping) {
@@ -94,7 +87,6 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
         player.jumping = true
       }
 
-      // physics
       player.vy += gravity
       player.y += player.vy
       if (player.y + player.h >= groundY) {
@@ -103,28 +95,51 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
         player.jumping = false
       }
 
-      // keep player inside canvas
-      if (_canvas) {
-        if (player.x < 0) player.x = 0
-        if (player.x + player.w > _canvas.width) player.x = _canvas.width - player.w
-      }
+      // Giới hạn biên
+      if (player.x < 0) player.x = 0
+      if (player.x + player.w > canvas.width) player.x = canvas.width - player.w
 
-      // scoring mechanic: every N ticks add points
-      tick++
-      if (tick % 60 === 0) {
-        score += 1
+      // Khi đến gần phải => hiển thị câu hỏi toán
+      if (player.x + player.w > canvas.width - 80) {
+        if (currentQuestion < questions.length) {
+          showQuestion = true
+          player.x = 60
+        } else {
+          // Kết thúc game
+          opts.onScore?.(score)
+          destroyPlatformer()
+        }
       }
+    }
 
-      // small hazard simulation: if player x near right edge -> "finish" and award big points
-      if (_canvas && player.x + player.w > _canvas.width - 60) {
-        // finish run
-        const finalScore = score + 10
-        opts.onScore?.(finalScore)
-        // then reset score locally but keep playing
-        score = 0
-        player.x = 60
-        player.y = groundY - player.h
+    function handleQuestionInput(e: KeyboardEvent) {
+      if (!showQuestion) return
+      const q = questions[currentQuestion]
+      const index = parseInt(e.key) - 1
+      if (isNaN(index) || index < 0 || index >= q.options.length) return
+      selectedAnswer = q.options[index]
+
+      if (selectedAnswer === q.correct_answer) {
+        score += 10
       }
+      currentQuestion++
+      selectedAnswer = null
+      showQuestion = false
+    }
+    window.addEventListener("keydown", handleQuestionInput)
+
+    function draw() {
+      if (!_ctx) return
+      const ctx = _ctx
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = "#0f172a"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = "#334155"
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY)
+      ctx.fillStyle = "#facc15"
+      ctx.fillRect(player.x, player.y, player.w, player.h)
+      drawHUD()
+      if (showQuestion) drawQuestion(questions[currentQuestion])
     }
 
     function loop() {
@@ -133,16 +148,15 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
         draw()
         _animationId = requestAnimationFrame(loop)
       } catch (err: any) {
-        console.error("Platformer loop error:", err)
+        console.error("Platformer error:", err)
         opts.onError?.(err)
-        destroyPlatformer()
       }
     }
 
     loop()
     return { destroy: destroyPlatformer }
   } catch (err: any) {
-    console.error("initPlatformer error:", err)
+    console.error(err)
     opts.onError?.(err)
     return { destroy: destroyPlatformer }
   }

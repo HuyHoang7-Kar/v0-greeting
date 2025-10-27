@@ -1,35 +1,32 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { initPlatformer, destroyPlatformer } from "@/scripts/game-platformer"
+import { initPlatformerMath, destroyPlatformer } from "@/scripts/game-platformer"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
 interface Props {
   gameId?: string
-  questions?: any[]
   onGameComplete?: (score: number, maxScore?: number, timeTaken?: number, pointsEarned?: number) => void
-  onScore?: (score: number) => void // backward compatibility
 }
 
-export function PlatformerGame({ gameId, onGameComplete, onScore }: Props) {
+export function PlatformerGame({ gameId, onGameComplete }: Props) {
   const canvasId = useRef(`platformer-canvas-${Math.random().toString(36).slice(2, 9)}`)
   const [running, setRunning] = useState(true)
   const [lastScore, setLastScore] = useState<number | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
-    // init platformer when mounted (client)
-    const { destroy } = initPlatformer(canvasId.current, {
+    const { destroy } = initPlatformerMath(canvasId.current, {
       width: 820,
       height: 360,
       onScore: async (score: number) => {
         try {
           setLastScore(score)
-          onScore?.(score)
-          // guardar en db: insert game_results and update user_points via RPC
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
+
+          // Lưu điểm vào Supabase
           await supabase.from("game_results").insert({
             user_id: user.id,
             game_id: gameId || "platformer-math",
@@ -38,13 +35,14 @@ export function PlatformerGame({ gameId, onGameComplete, onScore }: Props) {
             time_taken: 0,
             points_earned: score,
           })
-          // call RPC update_user_points if exists, fallback to upsert user_points
+
+          // Cập nhật điểm người chơi (nếu có RPC)
           const { error: rpcErr } = await supabase.rpc("update_user_points", {
             p_user_id: user.id,
             p_points_earned: score,
           }).catch(() => ({ error: true }))
+
           if (rpcErr) {
-            // fallback: upsert user_points
             await supabase.from("user_points").upsert({
               user_id: user.id,
               points: score,
@@ -57,7 +55,7 @@ export function PlatformerGame({ gameId, onGameComplete, onScore }: Props) {
         }
       },
       onError: (err) => {
-        console.error("Platformer reported error:", err)
+        console.error("Platformer error:", err)
       },
     })
 
@@ -65,7 +63,6 @@ export function PlatformerGame({ gameId, onGameComplete, onScore }: Props) {
       destroy()
       destroyPlatformer()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -75,36 +72,32 @@ export function PlatformerGame({ gameId, onGameComplete, onScore }: Props) {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => { setRunning((v) => !v); /* pausing not implemented in engine; you can destroy/init */ }}>
-          {running ? "Tạm dừng" : "Tiếp tục"}
+        <Button onClick={() => setRunning(v => !v)}>
+          {running ? "⏸️ Tạm dừng" : "▶️ Tiếp tục"}
         </Button>
 
         <Button variant="ghost" onClick={async () => {
-          // manual save lastScore
           if (lastScore == null) return alert("Chưa có điểm để lưu")
-          try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return alert("Chưa đăng nhập")
-            await supabase.from("game_results").insert({
-              user_id: user.id,
-              game_id: gameId || "platformer-math",
-              score: lastScore,
-              max_score: lastScore,
-              time_taken: 0,
-              points_earned: lastScore,
-            })
-            await supabase.rpc("update_user_points", { p_user_id: user.id, p_points_earned: lastScore }).catch(()=>{})
-            alert("Đã lưu điểm: " + lastScore)
-          } catch (err) {
-            console.error(err)
-            alert("Lỗi khi lưu điểm, xem console")
-          }
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return alert("Chưa đăng nhập")
+
+          await supabase.from("game_results").insert({
+            user_id: user.id,
+            game_id: gameId || "platformer-math",
+            score: lastScore,
+            max_score: lastScore,
+            time_taken: 0,
+            points_earned: lastScore,
+          })
+          alert("🎯 Đã lưu điểm: " + lastScore)
         }}>
-          Lưu điểm ({lastScore ?? 0})
+          💾 Lưu điểm ({lastScore ?? 0})
         </Button>
       </div>
 
-      <p className="text-sm text-gray-400">Dùng ← → để di chuyển, Space/ArrowUp để nhảy. Tiến đến cạnh phải để hoàn thành một lượt.</p>
+      <p className="text-sm text-gray-400 text-center">
+        Dùng ← → để di chuyển, Space/↑ để nhảy. Chạm vào đáp án đúng để nhận điểm! 🚀
+      </p>
     </div>
   )
 }
