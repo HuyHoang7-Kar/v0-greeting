@@ -1,5 +1,3 @@
-// /scripts/game-platformer.ts
-
 type Question = {
   question: string
   correct_answer: string
@@ -13,17 +11,17 @@ type InitOpts = {
   questions?: Question[]
   onScore?: (score: number) => void
   onError?: (err: Error) => void
+  sprite?: HTMLImageElement // sprite Mario
 }
 
 let _animationId: number | null = null
 let _canvas: HTMLCanvasElement | null = null
 let _ctx: CanvasRenderingContext2D | null = null
 let _keys: Record<string, boolean> = {}
+let _handleQuestionInput = (e: KeyboardEvent) => {}
 
 function _handleKeyDown(e: KeyboardEvent) { _keys[e.key] = true }
 function _handleKeyUp(e: KeyboardEvent) { _keys[e.key] = false }
-
-let _handleQuestionInput = (e: KeyboardEvent) => {}
 
 export function destroyPlatformer() {
   if (typeof window === "undefined") return
@@ -53,30 +51,17 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
 
     // ======= Setup base =======
     const groundY = 280
-    const player = { x: 60, y: groundY - 32, w: 32, h: 32, vy: 0, jumping: false }
+    const player = { x: 60, y: groundY - 48, w: 32, h: 48, vy: 0, jumping: false }
     const gravity = 0.9
     let score = 0
     let currentQuestion = 0
     let showQuestion = false
     let selectedAnswer: string | null = null
 
-    // ======= Questions =======
-    const baseQuestions: Record<string, Question[]> = {
-      easy: [
-        { question: "3 + 2 = ?", correct_answer: "5", options: ["4", "5", "6", "7"] },
-        { question: "7 - 5 = ?", correct_answer: "2", options: ["1", "2", "3", "4"] },
-      ],
-      medium: [
-        { question: "6 × 2 = ?", correct_answer: "12", options: ["10", "11", "12", "13"] },
-        { question: "9 ÷ 3 = ?", correct_answer: "3", options: ["2", "3", "4", "5"] },
-      ],
-      hard: [
-        { question: "15 ÷ (3 + 2) = ?", correct_answer: "3", options: ["2", "3", "4", "5"] },
-        { question: "√81 = ?", correct_answer: "9", options: ["7", "8", "9", "10"] },
-      ],
-    }
-
-    const questions = opts.questions || baseQuestions[opts.level || "easy"]
+    const questions: Question[] = opts.questions || [
+      { question: "3 + 2 = ?", correct_answer: "5", options: ["4", "5", "6", "7"] },
+      { question: "7 - 5 = ?", correct_answer: "2", options: ["1", "2", "3", "4"] },
+    ]
 
     // ======= Events =======
     window.addEventListener("keydown", _handleKeyDown)
@@ -89,7 +74,6 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       if (isNaN(index) || index < 0 || index >= q.options.length) return
       selectedAnswer = q.options[index]
 
-      // Nếu đúng, tăng điểm và gọi onScore ngay
       if (selectedAnswer === q.correct_answer) {
         score += 10
         opts.onScore?.(score)
@@ -149,13 +133,12 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       if (player.x < 0) player.x = 0
       if (player.x + player.w > canvas.width) player.x = canvas.width - player.w
 
-      // Khi đến gần phải → hiển thị câu hỏi
+      // Hiển thị câu hỏi
       if (player.x + player.w > canvas.width - 80) {
         if (currentQuestion < questions.length) {
           showQuestion = true
           player.x = 60
         } else {
-          // Kết thúc game → gọi onScore lần cuối
           opts.onScore?.(score)
           destroyPlatformer()
         }
@@ -171,8 +154,15 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.fillStyle = "#334155"
       ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY)
-      ctx.fillStyle = "#facc15"
-      ctx.fillRect(player.x, player.y, player.w, player.h)
+
+      // Vẽ nhân vật Mario
+      if (opts.sprite && opts.sprite.complete) {
+        ctx.drawImage(opts.sprite, player.x, player.y, player.w, player.h)
+      } else {
+        ctx.fillStyle = "#facc15"
+        ctx.fillRect(player.x, player.y, player.w, player.h)
+      }
+
       drawHUD()
       if (showQuestion && currentQuestion < questions.length)
         drawQuestion(questions[currentQuestion])
