@@ -18,7 +18,7 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
 
   useEffect(() => {
     const marioImg = new Image()
-    marioImg.src = "/sprites/mario.png"
+    marioImg.src = "app/public/sprites/mario.png"
 
     const blockImg = new Image()
     blockImg.src = "/sprites/block.png"
