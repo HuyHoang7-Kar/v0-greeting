@@ -27,7 +27,7 @@ interface QuizQuestionsProps {
   onQuestionsChange?: () => void
 }
 
-export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps) {
+export function CreateQuizForm({ quizId, onQuestionsChange }: QuizQuestionsProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
