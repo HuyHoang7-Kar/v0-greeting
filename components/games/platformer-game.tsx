@@ -17,14 +17,11 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
   const destroyRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    // ✅ Load ảnh từ thư mục /public/sprites/
     const marioImg = new Image()
-    marioImg.src = "/sprites/mario.png"
-
+    marioImg.src = "/sprites/mario.png" // ✅ Đường dẫn public
     const blockImg = new Image()
     blockImg.src = "/sprites/block.png"
 
-    // ✅ Khởi tạo game
     const { destroy } = initPlatformer(canvasId.current, {
       width: 820,
       height: 360,
@@ -36,13 +33,27 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
 
+          // 🔍 Lấy game_id từ bảng "game"
+          const { data: gameData, error: gameError } = await supabase
+            .from("game")
+            .select("id")
+            .eq("slug", gameId || "platformer-math")
+            .single()
+
+          if (gameError || !gameData) {
+            console.error("Không tìm thấy game:", gameError)
+            return
+          }
+
+          // 💾 Lưu điểm vào bảng game_results
           await supabase.from("game_results").upsert({
             user_id: user.id,
-            game_id: gameId || "platformer-math",
+            game_id: gameData.id,
             score,
             max_score: score,
             time_taken: 0,
             points_earned: score,
+            role: "student",
           }, { onConflict: ["user_id", "game_id"] })
 
           onGameComplete?.(score)
@@ -57,12 +68,44 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
     return () => destroy()
   }, [gameId, onGameComplete, supabase])
 
+  // 💾 Nút lưu điểm thủ công
+  const handleSaveScore = async () => {
+    if (lastScore === 0) return alert("Chưa có điểm để lưu")
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return alert("Chưa đăng nhập")
+
+    // Lấy game_id từ slug
+    const { data: gameData, error: gameError } = await supabase
+      .from("game")
+      .select("id")
+      .eq("slug", gameId || "platformer-math")
+      .single()
+
+    if (gameError || !gameData) {
+      console.error("Không tìm thấy game:", gameError)
+      return
+    }
+
+    await supabase.from("game_results").upsert({
+      user_id: user.id,
+      game_id: gameData.id,
+      score: lastScore,
+      max_score: lastScore,
+      time_taken: 0,
+      points_earned: lastScore,
+      role: "student",
+    }, { onConflict: ["user_id", "game_id"] })
+
+    alert(`🎯 Đã lưu điểm: ${lastScore}`)
+  }
+
   return (
     <div className="flex flex-col items-center space-y-3">
       <div className="w-full max-w-3xl">
         <canvas
           id={canvasId.current}
-          className="w-full border rounded-lg bg-black shadow-lg"
+          className="w-full border rounded-lg bg-black"
         />
       </div>
 
@@ -71,25 +114,7 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
           ⏸️ Tạm dừng
         </Button>
 
-        <Button
-          variant="ghost"
-          onClick={async () => {
-            if (lastScore === 0) return alert("Chưa có điểm để lưu")
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return alert("Chưa đăng nhập")
-
-            await supabase.from("game_results").upsert({
-              user_id: user.id,
-              game_id: gameId || "platformer-math",
-              score: lastScore,
-              max_score: lastScore,
-              time_taken: 0,
-              points_earned: lastScore,
-            }, { onConflict: ["user_id", "game_id"] })
-
-            alert(`🎯 Đã lưu điểm: ${lastScore}`)
-          }}
-        >
+        <Button variant="ghost" onClick={handleSaveScore}>
           💾 Lưu điểm ({lastScore})
         </Button>
       </div>
