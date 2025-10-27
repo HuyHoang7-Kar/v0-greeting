@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { destroyPlatformer } from "@/scripts/game-platformer"
-import { initPlatformer } from "@/scripts/game-platformer"
+import { destroyPlatformer, initPlatformer } from "@/scripts/game-platformer"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -16,18 +15,18 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
   const [running, setRunning] = useState(true)
   const [lastScore, setLastScore] = useState<number | null>(null)
   const supabase = createClient()
+  const destroyRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    const { destroy } = initPlatformerMath(canvasId.current, {
+    const { destroy } = initPlatformer(canvasId.current, {
       width: 820,
       height: 360,
       onScore: async (score: number) => {
+        setLastScore(score)
         try {
-          setLastScore(score)
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
 
-          // Lưu điểm vào Supabase
           await supabase.from("game_results").insert({
             user_id: user.id,
             game_id: gameId || "platformer-math",
@@ -37,7 +36,6 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
             points_earned: score,
           })
 
-          // Cập nhật điểm người chơi (nếu có RPC)
           const { error: rpcErr } = await supabase.rpc("update_user_points", {
             p_user_id: user.id,
             p_points_earned: score,
@@ -60,11 +58,23 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
       },
     })
 
+    destroyRef.current = destroy
+
     return () => {
       destroy()
       destroyPlatformer()
     }
-  }, [])
+  }, [gameId, onGameComplete, supabase])
+
+  // Tạm dừng/tiếp tục bằng cách remove/add animation frame
+  useEffect(() => {
+    if (running) {
+      // Chạy lại game
+      initPlatformer(canvasId.current)
+    } else {
+      destroyPlatformer()
+    }
+  }, [running])
 
   return (
     <div className="flex flex-col items-center space-y-3">
