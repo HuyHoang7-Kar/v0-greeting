@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@/lib/supabase/client"
 
 export default function PlatformerGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
