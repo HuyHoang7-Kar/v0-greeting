@@ -4,8 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-// Chỉnh import thành default export
-import { CreateQuizForm } from "@/components/teacher/create-quiz-form"
 import CreateQuizForm from "@/components/teacher/create-quiz-form"
 import { Plus, Brain, Trash2, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -29,15 +27,11 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
 
   const handleDeleteQuiz = async (id: string) => {
     if (!confirm("Are you sure you want to delete this quiz? This will also delete all questions.")) return
-
     setIsLoading(true)
     try {
       const supabase = createClient()
       const { error } = await supabase.from("quizzes").delete().eq("id", id)
-
-      if (!error) {
-        onQuizzesChange()
-      }
+      if (!error) onQuizzesChange()
     } catch (error) {
       console.error("Error deleting quiz:", error)
     } finally {
@@ -50,6 +44,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
     onQuizzesChange()
   }
 
+  // Nếu đang xem quiz để thêm câu hỏi
   if (selectedQuiz) {
     return (
       <div className="space-y-6">
@@ -59,7 +54,8 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
             Back to Quizzes
           </Button>
         </div>
-        <QuizQuestions quizId={selectedQuiz} onQuestionsChange={onQuizzesChange} />
+        {/* Gọi CreateQuizForm với quizId để thêm câu hỏi */}
+        <CreateQuizForm quizId={selectedQuiz} onSuccess={handleQuizCreated} />
       </div>
     )
   }
