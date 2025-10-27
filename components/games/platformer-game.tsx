@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { initPlatformerMath, destroyPlatformer } from "@/scripts/game-platformer"
+import { destroyPlatformer } from "@/scripts/game-platformer"
+import { initPlatformer } from "@/scripts/game-platformer"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
