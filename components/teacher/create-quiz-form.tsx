@@ -1,4 +1,5 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Edit, Trash2, Save, X, HelpCircle } from "lucide-react"
+import { Plus, Edit, Trash2, Save, X, HelpCircle, Loader2 } from "lucide-react"
 
 interface QuizQuestion {
   id: string
@@ -31,31 +32,28 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [newQuestion, setNewQuestion] = useState({
+
+  const emptyQuestion = {
     question: "",
     option_a: "",
     option_b: "",
     option_c: "",
     option_d: "",
     correct_answer: "A" as "A" | "B" | "C" | "D",
-  })
-  const [editQuestion, setEditQuestion] = useState({
-    question: "",
-    option_a: "",
-    option_b: "",
-    option_c: "",
-    option_d: "",
-    correct_answer: "A" as "A" | "B" | "C" | "D",
-  })
+  }
+
+  const [newQuestion, setNewQuestion] = useState(emptyQuestion)
+  const [editQuestion, setEditQuestion] = useState(emptyQuestion)
 
   useEffect(() => {
     loadQuestions()
   }, [quizId])
 
+  const supabase = createClient()
+
   const loadQuestions = async () => {
     setIsLoading(true)
     try {
-      const supabase = createClient()
       const { data, error } = await supabase
         .from("quiz_questions")
         .select("*")
@@ -74,13 +72,12 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
     if (!newQuestion.question.trim() || !newQuestion.option_a.trim() || !newQuestion.option_b.trim() || !newQuestion.option_c.trim() || !newQuestion.option_d.trim()) return
     setIsLoading(true)
     try {
-      const supabase = createClient()
       const { error } = await supabase.from("quiz_questions").insert({
         quiz_id: quizId,
         ...newQuestion
       })
       if (error) throw error
-      setNewQuestion({ question: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_answer: "A" })
+      setNewQuestion(emptyQuestion)
       setShowCreateForm(false)
       loadQuestions()
       onQuestionsChange?.()
@@ -100,7 +97,6 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
     if (!editQuestion.question.trim() || !editQuestion.option_a.trim() || !editQuestion.option_b.trim() || !editQuestion.option_c.trim() || !editQuestion.option_d.trim()) return
     setIsLoading(true)
     try {
-      const supabase = createClient()
       const { error } = await supabase
         .from("quiz_questions")
         .update(editQuestion)
@@ -120,7 +116,6 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
     if (!confirm("Are you sure you want to delete this question?")) return
     setIsLoading(true)
     try {
-      const supabase = createClient()
       const { error } = await supabase.from("quiz_questions").delete().eq("id", id)
       if (error) throw error
       loadQuestions()
@@ -132,11 +127,15 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
     }
   }
 
-  const getCorrectAnswerColor = (option: string, correctAnswer: string) => {
-    return option === correctAnswer ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-50 border-gray-200"
-  }
+  const getCorrectAnswerColor = (option: string, correctAnswer: string) =>
+    option === correctAnswer ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-50 border-gray-200"
 
-  if (isLoading) return <div className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div><p className="text-gray-600">Loading questions...</p></div>
+  if (isLoading) return (
+    <div className="text-center py-8">
+      <Loader2 className="animate-spin h-8 w-8 mx-auto mb-4" />
+      <p className="text-gray-600">Loading questions...</p>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -155,20 +154,22 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
       {/* Create Question Form */}
       {showCreateForm && (
         <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5" />Add New Question</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5" />Add New Question</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <Label>Question *</Label>
-            <Textarea value={newQuestion.question} onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })} className="min-h-20" />
+            <Textarea value={newQuestion.question} onChange={e => setNewQuestion({ ...newQuestion, question: e.target.value })} className="min-h-20" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {["a","b","c","d"].map(opt => (
                 <div key={opt} className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Option {opt.toUpperCase()} *</Label>
-                  <Input placeholder={`Option ${opt.toUpperCase()}`} value={newQuestion[`option_${opt}` as keyof typeof newQuestion]} onChange={(e) => setNewQuestion({ ...newQuestion, [`option_${opt}`]: e.target.value })}/>
+                  <Input placeholder={`Option ${opt.toUpperCase()}`} value={newQuestion[`option_${opt}` as keyof typeof newQuestion]} onChange={e => setNewQuestion({ ...newQuestion, [`option_${opt}`]: e.target.value })}/>
                 </div>
               ))}
             </div>
             <Label>Correct Answer *</Label>
-            <Select value={newQuestion.correct_answer} onValueChange={(value) => setNewQuestion({ ...newQuestion, correct_answer: value as "A"|"B"|"C"|"D" })}>
+            <Select value={newQuestion.correct_answer} onValueChange={value => setNewQuestion({ ...newQuestion, correct_answer: value as "A"|"B"|"C"|"D" })}>
               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {["A","B","C","D"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
@@ -176,7 +177,7 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
             </Select>
             <div className="flex gap-2">
               <Button onClick={handleCreateQuestion} disabled={isLoading} className="bg-blue-500 hover:bg-blue-600 text-white"><Save className="w-4 h-4 mr-2" />Add Question</Button>
-              <Button variant="outline" onClick={() => { setShowCreateForm(false); setNewQuestion({ question: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_answer: "A" }) }}>Cancel</Button>
+              <Button variant="outline" onClick={() => { setShowCreateForm(false); setNewQuestion(emptyQuestion) }}>Cancel</Button>
             </div>
           </CardContent>
         </Card>
@@ -217,13 +218,13 @@ export function QuizQuestions({ quizId, onQuestionsChange }: QuizQuestionsProps)
               <CardContent className="space-y-4">
                 {editingId === q.id ? (
                   <>
-                    <Textarea value={editQuestion.question} onChange={(e) => setEditQuestion({ ...editQuestion, question: e.target.value })} className="min-h-20" />
+                    <Textarea value={editQuestion.question} onChange={e => setEditQuestion({ ...editQuestion, question: e.target.value })} className="min-h-20" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {["a","b","c","d"].map(opt => (
-                        <Input key={opt} value={editQuestion[`option_${opt}` as keyof typeof editQuestion]} onChange={(e) => setEditQuestion({ ...editQuestion, [`option_${opt}`]: e.target.value })} placeholder={`Option ${opt.toUpperCase()}`} />
+                        <Input key={opt} value={editQuestion[`option_${opt}` as keyof typeof editQuestion]} onChange={e => setEditQuestion({ ...editQuestion, [`option_${opt}`]: e.target.value })} placeholder={`Option ${opt.toUpperCase()}`} />
                       ))}
                     </div>
-                    <Select value={editQuestion.correct_answer} onValueChange={(value) => setEditQuestion({ ...editQuestion, correct_answer: value as "A"|"B"|"C"|"D" })}>
+                    <Select value={editQuestion.correct_answer} onValueChange={value => setEditQuestion({ ...editQuestion, correct_answer: value as "A"|"B"|"C"|"D" })}>
                       <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {["A","B","C","D"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
