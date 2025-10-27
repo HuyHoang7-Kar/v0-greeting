@@ -97,7 +97,7 @@ export function MathCalculatorGame({
     }
   };
 
-  // ✅ Lưu điểm vào Supabase
+  // ✅ Lưu điểm (game, game_plays, game_scores, user_totals)
   const saveGameResult = async (finalScore: number, maxScore: number, timeTaken: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -115,15 +115,14 @@ export function MathCalculatorGame({
         return;
       }
 
-      // Tìm hoặc tạo game
-      const { data: game } = await supabase
+      // 🔹 Tìm hoặc tạo game
+      let { data: game } = await supabase
         .from("game")
         .select("id")
         .eq("slug", gameId)
         .single();
 
-      let gameUUID = game?.id;
-      if (!gameUUID) {
+      if (!game) {
         const { data: newGame } = await supabase
           .from("game")
           .insert({
@@ -133,22 +132,62 @@ export function MathCalculatorGame({
           })
           .select("id")
           .single();
-        gameUUID = newGame?.id;
+        game = newGame;
       }
 
-      // Ghi attempt mới
-      const { error } = await supabase.from("game_attempts").insert({
-        user_id: user.id,
-        game_id: gameUUID,
-        score: finalScore,
-        max_score: maxScore,
-        time_taken: timeTaken,
-      });
+      // 🔹 Ghi lượt chơi (mỗi lần 1 record)
+      const { data: play, error: playError } = await supabase
+        .from("game_plays")
+        .insert({
+          user_id: user.id,
+          game_id: game.id,
+          score: finalScore,
+          max_score: maxScore,
+          time_taken: timeTaken,
+          finished_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
 
-      if (error) throw error;
-      console.log("✅ Saved score:", finalScore);
+      if (playError) throw playError;
+
+      // 🔹 Ghi điểm chi tiết từng câu
+      const detailedScores = questions.map((q) => ({
+        play_id: play.id,
+        question_id: q.id,
+        points: q.points,
+        is_correct: Math.abs(parseFloat(q.correct_answer) - parseFloat(q.correct_answer)) < 0.01,
+      }));
+
+      await supabase.from("game_scores").insert(detailedScores);
+
+      // 🔹 Cập nhật tổng điểm user_totals
+      const { data: existingTotal } = await supabase
+        .from("user_totals")
+        .select("total_score, total_plays")
+        .eq("user_id", user.id)
+        .single();
+
+      if (existingTotal) {
+        await supabase
+          .from("user_totals")
+          .update({
+            total_score: existingTotal.total_score + finalScore,
+            total_plays: existingTotal.total_plays + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+      } else {
+        await supabase.from("user_totals").insert({
+          user_id: user.id,
+          total_score: finalScore,
+          total_plays: 1,
+        });
+      }
+
+      console.log("✅ Lưu điểm thành công:", finalScore);
     } catch (error) {
-      console.error("Error saving game result:", error);
+      console.error("❌ Lỗi khi lưu điểm:", error);
     }
   };
 
@@ -190,7 +229,7 @@ export function MathCalculatorGame({
   const progress =
     ((currentQuestionIndex + (showResult ? 1 : 0)) / questions.length) * 100;
 
-  // 🧩 Giao diện
+  // 🧩 UI
   if (!gameStarted) {
     return (
       <div className="text-center space-y-6">
@@ -225,10 +264,8 @@ export function MathCalculatorGame({
     );
   }
 
-  // ⏱ Khi đang chơi
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-gray-900">Máy tính Toán học</h2>
@@ -243,12 +280,9 @@ export function MathCalculatorGame({
         </Badge>
       </div>
 
-      {/* Thanh tiến trình */}
       <Progress value={progress} className="h-2" />
 
-      {/* Vùng chơi */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Câu hỏi */}
         <Card className="p-6">
           <CardContent className="space-y-4">
             {showResult ? (
@@ -289,7 +323,6 @@ export function MathCalculatorGame({
           </CardContent>
         </Card>
 
-        {/* Máy tính */}
         <Card className="p-6">
           <CardContent className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Máy tính</h3>
