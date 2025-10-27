@@ -11,10 +11,13 @@ import { FlashcardStudyMode } from "@/components/student/flashcard-study-mode"
 import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
-import { GameHub } from "@/components/games/game-hub"
 import { Leaderboard } from "@/components/rewards/leaderboard"
 import { UserProfile } from "@/components/rewards/user-profile"
-import { BookOpen, Brain, FileText, TrendingUp, Play, LogOut, User, Gamepad2, Trophy, Medal } from "lucide-react"
+import { PlatformerGame } from "@/components/games/platformer-game"
+import {
+  BookOpen, Brain, FileText, TrendingUp, LogOut,
+  User, Gamepad2, Trophy, Medal
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface Profile {
@@ -38,7 +41,6 @@ export function StudentDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
-
   const supabase = createClient()
 
   useEffect(() => {
@@ -48,56 +50,52 @@ export function StudentDashboard() {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true)
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-      if (userError || !user) throw new Error("User not authenticated")
-
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) throw new Error("User not authenticated")
       setUser(user)
 
-      // 🧩 Lấy profile
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-      setProfile(profileData)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single()
 
-      // 🧩 Lấy flashcards
       const { data: flashcardsData } = await supabase
         .from("flashcards")
         .select("*")
         .order("created_at", { ascending: false })
 
-      // 🧩 Lấy quizzes
-      const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
+      const { data: quizzesData } = await supabase
+        .from("quizzes")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-      // 🧩 Lấy notes của user
       const { data: notesData } = await supabase
         .from("notes")
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
-      // 🧩 Lấy kết quả quiz
       const { data: resultsData } = await supabase
         .from("results")
-        .select(
-          `
-          *,
-          quizzes ( title )
-        `
-        )
+        .select(`*, quizzes ( title )`)
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false })
 
-      // 🧩 Lấy điểm user
-      const { data: pointsData } = await supabase.from("user_points").select("*").eq("user_id", user.id).single()
+      const { data: pointsData } = await supabase
+        .from("user_points")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
 
+      setProfile(profileData)
       setFlashcards(flashcardsData || [])
       setQuizzes(quizzesData || [])
       setNotes(notesData || [])
       setResults(resultsData || [])
       setUserPoints(pointsData)
-    } catch (error) {
-      console.error("❌ Lỗi load dashboard:", error)
+    } catch (err) {
+      console.error("❌ Lỗi load dashboard:", err)
     } finally {
       setIsLoading(false)
     }
@@ -111,6 +109,22 @@ export function StudentDashboard() {
   const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
+  }
+
+  const handleGameScore = async (score: number) => {
+    if (!user) return
+    try {
+      await supabase.from("user_points").upsert(
+        {
+          user_id: user.id,
+          total_points: (userPoints?.total_points || 0) + score,
+        },
+        { onConflict: "user_id" }
+      )
+      loadDashboardData()
+    } catch (error) {
+      console.error("⚠️ Lỗi lưu điểm:", error)
+    }
   }
 
   if (isLoading) {
@@ -130,9 +144,7 @@ export function StudentDashboard() {
         <div className="container mx-auto">
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-3xl font-bold text-gray-900">Chế Độ Học Tập</h1>
-            <Button variant="outline" onClick={() => setStudyMode(false)} className="border-gray-300">
-              Thoát Chế Độ Học
-            </Button>
+            <Button variant="outline" onClick={() => setStudyMode(false)}>Thoát Chế Độ Học</Button>
           </div>
           <FlashcardStudyMode flashcards={flashcards} onComplete={handleStudyComplete} />
         </div>
@@ -152,77 +164,35 @@ export function StudentDashboard() {
               <p className="text-sm text-gray-600">Bảng Điều Khiển Học Sinh</p>
             </div>
           </div>
+
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-700">
-                {profile?.full_name || profile?.email || user?.email || "Người dùng"}
-              </span>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Học Sinh
-              </Badge>
+              <span className="text-sm text-gray-700">{profile?.full_name || user?.email}</span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">Học Sinh</Badge>
               {userPoints && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  <Medal className="w-3 h-3 mr-1" />
-                  {userPoints.total_points || 0} điểm
+                  <Medal className="w-3 h-3 mr-1" />{userPoints.total_points || 0} điểm
                 </Badge>
               )}
             </div>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
-              Đăng Xuất
+              <LogOut className="w-4 h-4" />Đăng Xuất
             </Button>
           </div>
         </div>
       </header>
 
+      {/* Tabs */}
       <div className="container mx-auto px-4 py-8">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {[
-            { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" },
-            { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" },
-            { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" },
-            { label: "Điểm Tổng", value: userPoints?.total_points || 0, icon: Trophy, color: "purple" },
-          ].map(({ label, value, icon: Icon, color }, idx) => (
-            <Card
-              key={idx}
-              className={`border-2 border-${color}-200 bg-gradient-to-br from-${color}-50 to-${color}-100`}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{label}</p>
-                    <p className="text-3xl font-bold text-gray-900">{value}</p>
-                  </div>
-                  <Icon className={`w-8 h-8 text-${color}-600`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Main Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 bg-white border-2 border-gray-200">
-            <TabsTrigger value="flashcards">
-              <BookOpen className="w-4 h-4" /> Thẻ Học
-            </TabsTrigger>
-            <TabsTrigger value="games">
-              <Gamepad2 className="w-4 h-4" /> Trò Chơi
-            </TabsTrigger>
-            <TabsTrigger value="quizzes">
-              <Brain className="w-4 h-4" /> Kiểm Tra
-            </TabsTrigger>
-            <TabsTrigger value="notes">
-              <FileText className="w-4 h-4" /> Ghi Chú
-            </TabsTrigger>
-            <TabsTrigger value="progress">
-              <TrendingUp className="w-4 h-4" /> Tiến Độ
-            </TabsTrigger>
-            <TabsTrigger value="leaderboard">
-              <Trophy className="w-4 h-4" /> Xếp Hạng
-            </TabsTrigger>
+            <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
+            <TabsTrigger value="games"><Gamepad2 className="w-4 h-4" /> Trò Chơi</TabsTrigger>
+            <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
+            <TabsTrigger value="notes"><FileText className="w-4 h-4" /> Ghi Chú</TabsTrigger>
+            <TabsTrigger value="progress"><TrendingUp className="w-4 h-4" /> Tiến Độ</TabsTrigger>
+            <TabsTrigger value="leaderboard"><Trophy className="w-4 h-4" /> Xếp Hạng</TabsTrigger>
           </TabsList>
 
           <TabsContent value="flashcards">
@@ -231,7 +201,7 @@ export function StudentDashboard() {
           </TabsContent>
 
           <TabsContent value="games">
-            <GameHub />
+            <PlatformerGame onScore={handleGameScore} />
           </TabsContent>
 
           <TabsContent value="quizzes">
