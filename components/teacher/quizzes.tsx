@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 // Chỉnh import thành default export
 import { CreateQuizForm } from "@/components/teacher/create-quiz-form"
-import { QuizQuestions } from "@/components/teacher/quiz-questions"
+import CreateQuizForm from "@/components/teacher/create-quiz-form"
 import { Plus, Brain, Trash2, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
