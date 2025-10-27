@@ -10,19 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase/client"
 import { Plus, Loader2 } from "lucide-react"
 
-interface CreateQuizFormProps {
+interface CreateFlashcardFormProps {
   onSuccess?: () => void
 }
 
-export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
+export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
   const [question, setQuestion] = useState("")
-  const [optionA, setOptionA] = useState("")
-  const [optionB, setOptionB] = useState("")
-  const [optionC, setOptionC] = useState("")
-  const [optionD, setOptionD] = useState("")
-  const [correct, setCorrect] = useState<"A" | "B" | "C" | "D">("A")
+  const [answer, setAnswer] = useState("")
+  const [category, setCategory] = useState("")
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,91 +30,94 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
     try {
       const supabase = createClient()
 
-      // Lấy user hiện tại
+      // Lấy user hiện tại từ session
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser()
-      if (userError || !user) throw new Error(userError?.message || "You must be logged in")
 
-      // 1️⃣ Tạo quiz
-      const { data: quiz, error: quizError } = await supabase
-        .from("quizzes")
-        .insert({ title: title.trim(), description: description.trim(), created_by: user.id, teacher_id: user.id })
-        .select()
-        .single()
-      if (quizError || !quiz) throw new Error(quizError?.message || "Quiz creation failed")
+      if (userError) {
+        console.error("getUser error:", userError)
+        throw new Error(userError.message ?? "Could not get user")
+      }
+      if (!user) {
+        throw new Error("You must be logged in to create flashcards")
+      }
 
-      // 2️⃣ Tạo câu hỏi đầu tiên
-      const { error: questionError } = await supabase.from("quiz_questions").insert({
-        quiz_id: quiz.id,
+      const payload = {
         question: question.trim(),
-        option_a: optionA.trim(),
-        option_b: optionB.trim(),
-        option_c: optionC.trim(),
-        option_d: optionD.trim(),
-        correct_answer: correct,
-      })
-      if (questionError) throw new Error(questionError.message)
+        answer: answer.trim(),
+        category: category.trim() || null,
+        difficulty,
+        created_by: user.id, // <-- gửi cột này (phù hợp DB hiện tại)
+      }
+
+      console.debug("Creating flashcard payload:", payload)
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("flashcards")
+        .insert(payload)
+        .select() // trả về record đã chèn
+
+      if (insertError) {
+        // Log chi tiết để bạn thấy trong console (Network cũng có response)
+        console.error("Insert flashcard error (raw):", insertError)
+        // normalize to Error để catch có message
+        throw new Error(insertError.message ?? JSON.stringify(insertError))
+      }
+
+      console.log("Inserted flashcard:", inserted)
 
       // Reset form
-      setTitle("")
-      setDescription("")
       setQuestion("")
-      setOptionA("")
-      setOptionB("")
-      setOptionC("")
-      setOptionD("")
-      setCorrect("A")
+      setAnswer("")
+      setCategory("")
+      setDifficulty("medium")
 
       onSuccess?.()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Unknown error")
+      console.error("Create flashcard failed:", err)
+      const msg =
+        err instanceof Error ? err.message : JSON.stringify(err, Object.getOwnPropertyNames(err))
+      setError(msg || "An error occurred")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
+    <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-gray-900">
           <Plus className="w-5 h-5" />
-          Create New Quiz
+          Create New Flashcard
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Quiz Title *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter quiz title"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description *</Label>
+            <Label htmlFor="question" className="text-sm font-medium text-gray-700">
+              Question *
+            </Label>
             <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter quiz description"
+              id="question"
+              placeholder="Enter your question here..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
               required
               className="min-h-20"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="question">First Question *</Label>
+            <Label htmlFor="answer" className="text-sm font-medium text-gray-700">
+              Answer *
+            </Label>
             <Textarea
-              id="question"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Enter the question"
+              id="answer"
+              placeholder="Enter the answer here..."
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
               required
               className="min-h-20"
             />
@@ -126,36 +125,32 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Option A *</Label>
-              <Input value={optionA} onChange={(e) => setOptionA(e.target.value)} required />
+              <Label htmlFor="category" className="text-sm font-medium text-gray-700">
+                Category (Optional)
+              </Label>
+              <Input
+                id="category"
+                placeholder="e.g., Mathematics, History"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Option B *</Label>
-              <Input value={optionB} onChange={(e) => setOptionB(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Option C *</Label>
-              <Input value={optionC} onChange={(e) => setOptionC(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Option D *</Label>
-              <Input value={optionD} onChange={(e) => setOptionD(e.target.value)} required />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Correct Answer *</Label>
-            <Select value={correct} onValueChange={(value: "A" | "B" | "C" | "D") => setCorrect(value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A">A</SelectItem>
-                <SelectItem value="B">B</SelectItem>
-                <SelectItem value="C">C</SelectItem>
-                <SelectItem value="D">D</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label htmlFor="difficulty" className="text-sm font-medium text-gray-700">
+                Difficulty
+              </Label>
+              <Select value={difficulty} onValueChange={(value: "easy" | "medium" | "hard") => setDifficulty(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {error && (
@@ -164,8 +159,8 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
 
           <Button
             type="submit"
-            disabled={isLoading || !title.trim() || !description.trim() || !question.trim()}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+            disabled={isLoading || !question.trim() || !answer.trim()}
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
           >
             {isLoading ? (
               <>
@@ -175,7 +170,7 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
             ) : (
               <>
                 <Plus className="w-4 h-4 mr-2" />
-                Create Quiz
+                Create Flashcard
               </>
             )}
           </Button>
