@@ -6,23 +6,83 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  gameId?: string;
+  gameSlug?: string;
   onGameComplete?: (score: number) => void;
 }
 
-export function PlatformerGame({ gameId = "platformer-mario", onGameComplete }: Props) {
-  const canvasId = useRef(`platformer-canvas-${Math.random().toString(36).slice(2, 9)}`);
+export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }: Props) {
+  const canvasId = useRef(`platformer-${Math.random().toString(36).slice(2, 9)}`);
   const [lastScore, setLastScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const destroyRef = useRef<() => void>(() => {});
 
+  // 🧩 Hàm lấy hoặc tạo game_id tương ứng với slug
+  const getOrCreateGameId = async () => {
+    const { data: game, error: fetchErr } = await supabase
+      .from("game")
+      .select("id")
+      .eq("slug", gameSlug)
+      .single();
+
+    if (fetchErr && fetchErr.code !== "PGRST116") console.error(fetchErr);
+
+    if (game) return game.id;
+
+    const { data: newGame, error: insertErr } = await supabase
+      .from("game")
+      .insert({
+        slug: gameSlug,
+        title: "Mario Platformer",
+        description: "Trò chơi học toán kiểu Mario",
+      })
+      .select("id")
+      .single();
+
+    if (insertErr) throw insertErr;
+    return newGame.id;
+  };
+
+  // 🧠 Lưu điểm vào game_attempts
+  const saveScore = async (score: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return alert("Bạn cần đăng nhập trước!");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile || profile.role !== "student") {
+        return alert("Chỉ học sinh mới có thể lưu điểm!");
+      }
+
+      const gameId = await getOrCreateGameId();
+
+      const { error: insertError } = await supabase.from("game_attempts").insert({
+        user_id: user.id,
+        game_id: gameId,
+        score,
+      });
+
+      if (insertError) throw insertError;
+
+      alert(`🎯 Điểm ${score} đã được lưu!`);
+      onGameComplete?.(score);
+    } catch (err) {
+      console.error("Error saving score:", err);
+      alert("⚠️ Lỗi khi lưu điểm!");
+    }
+  };
+
+  // 🎮 Khởi tạo game
   useEffect(() => {
     const marioImg = new Image();
-    marioImg.src = "/sprites/mario.png"; // ✅ Đường dẫn public (NextJS cho phép)
-
+    marioImg.src = "/sprites/mario.png";
     const blockImg = new Image();
-    blockImg.src = "/sprites/block.png"; // ✅ Đường dẫn public
+    blockImg.src = "/sprites/block.png";
 
     const { destroy } = initPlatformer(canvasId.current, {
       width: 820,
@@ -31,27 +91,7 @@ export function PlatformerGame({ gameId = "platformer-mario", onGameComplete }: 
       block: blockImg,
       onScore: async (score: number) => {
         setLastScore(score);
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
-
-          // 🧠 Lưu điểm trực tiếp vào bảng game
-          await supabase.from("game").upsert(
-            {
-              slug: gameId,
-              title: "Mario Platformer",
-              description: "Trò chơi học toán kiểu Mario",
-              user_id: user.id,
-              score,
-              points_earned: score,
-            },
-            { onConflict: ["slug", "user_id"] }
-          );
-
-          onGameComplete?.(score);
-        } catch (err) {
-          console.error("Error saving score:", err);
-        }
+        await saveScore(score);
       },
       onError: (err) => console.error(err),
     });
@@ -60,7 +100,7 @@ export function PlatformerGame({ gameId = "platformer-mario", onGameComplete }: 
     setLoading(false);
 
     return () => destroy();
-  }, [gameId, onGameComplete, supabase]);
+  }, [gameSlug]);
 
   return (
     <div className="flex flex-col items-center space-y-3">
@@ -72,30 +112,13 @@ export function PlatformerGame({ gameId = "platformer-mario", onGameComplete }: 
       </div>
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => destroyPlatformer()}>
-          ⏸️ Tạm dừng
-        </Button>
+        <Button onClick={() => destroyPlatformer()}>⏸️ Tạm dừng</Button>
 
         <Button
           variant="ghost"
-          onClick={async () => {
+          onClick={() => {
             if (lastScore === 0) return alert("Chưa có điểm để lưu");
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return alert("Chưa đăng nhập");
-
-            await supabase.from("game").upsert(
-              {
-                slug: gameId,
-                title: "Mario Platformer",
-                description: "Trò chơi học toán kiểu Mario",
-                user_id: user.id,
-                score: lastScore,
-                points_earned: lastScore,
-              },
-              { onConflict: ["slug", "user_id"] }
-            );
-
-            alert(`🎯 Đã lưu điểm: ${lastScore}`);
+            saveScore(lastScore);
           }}
         >
           💾 Lưu điểm ({lastScore})
