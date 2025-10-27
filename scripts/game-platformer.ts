@@ -36,9 +36,10 @@ export function destroyPlatformer() {
   _keys = {}
 }
 
-export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
+export async function initPlatformer(canvasId: string, opts: InitOpts = {}) {
   try {
     destroyPlatformer()
+
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null
     if (!canvas) throw new Error(`Canvas not found: ${canvasId}`)
     _canvas = canvas
@@ -48,6 +49,10 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
 
     canvas.width = opts.width || 820
     canvas.height = opts.height || 360
+
+    // ✅ Chờ ảnh load xong trước khi bắt đầu
+    if (opts.sprite && !opts.sprite.complete) await opts.sprite.decode()
+    if (opts.block && !opts.block.complete) await opts.block.decode()
 
     const groundY = 280
     const player = { x: 60, y: groundY - 48, w: 32, h: 48, vy: 0, jumping: false }
@@ -86,7 +91,7 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
 
       if (selectedAnswer === q.correct_answer) {
         score += 10
-        opts.onScore?.(score)  // Lưu điểm ngay khi trả lời đúng
+        opts.onScore?.(score)
       }
       currentQuestion++
       selectedAnswer = null
