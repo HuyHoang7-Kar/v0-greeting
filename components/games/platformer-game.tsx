@@ -21,7 +21,7 @@ export function PlatformerGame({ gameId, onGameComplete }: Props) {
     marioImg.src = "app/public/sprites/mario.png"
 
     const blockImg = new Image()
-    blockImg.src = "/sprites/block.png"
+    blockImg.src = "app/public/sprites/block.png"
 
     const { destroy } = initPlatformer(canvasId.current, {
       width: 820,
