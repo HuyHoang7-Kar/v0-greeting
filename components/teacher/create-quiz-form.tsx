@@ -1,24 +1,20 @@
 "use client"
 
-import type React from "react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Loader2 } from "lucide-react"
+import { Button, Input, Textarea, Label } from "@/components/ui"
 
-interface CreateQuizFormProps {
-  onSuccess?: () => void
-}
-
-export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
+export function CreateQuizWithQuestionForm() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [question, setQuestion] = useState("")
+  const [optionA, setOptionA] = useState("")
+  const [optionB, setOptionB] = useState("")
+  const [optionC, setOptionC] = useState("")
+  const [optionD, setOptionD] = useState("")
+  const [correct, setCorrect] = useState<"A"|"B"|"C"|"D">("A")
   const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,121 +23,68 @@ export function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
 
     try {
       const supabase = createClient()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) throw new Error("Must be logged in")
 
-      // lấy current user (session)
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
+      // 1️⃣ Tạo quiz
+      const { data: quiz, error: quizError } = await supabase.from("quizzes")
+        .insert({ title, description, created_by: user.id, teacher_id: user.id })
+        .select()
+        .single()
+      if (quizError || !quiz) throw new Error(quizError?.message || "Quiz insert failed")
 
-      if (userError) {
-        console.error("getUser error:", userError)
-        throw new Error(userError.message ?? "Could not get user")
-      }
-      if (!user) {
-        throw new Error("You must be logged in to create quizzes")
-      }
+      // 2️⃣ Tạo câu hỏi
+      const { error: questionError } = await supabase.from("quiz_questions")
+        .insert({
+          quiz_id: quiz.id,
+          question,
+          option_a: optionA,
+          option_b: optionB,
+          option_c: optionC,
+          option_d: optionD,
+          correct_answer: correct
+        })
+      if (questionError) throw new Error(questionError.message)
 
-      // Insert — gửi cả created_by và teacher_id để tương thích với cấu trúc DB của bạn
-      // (nếu DB chỉ cần 1 trong 2 thì vẫn ok; gửi cả 2 tránh bị thiếu cột bắt buộc)
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        created_by: user.id,  // cột hiện có NOT NULL trong DB của bạn
-        teacher_id: user.id,  // cột tồn tại trong DB (nullable) — dùng cho policy nếu cần
-      }
-
-      console.debug("Creating quiz with payload:", payload)
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("quizzes")
-        .insert(payload)
-        .select() // trả về row để dễ debug
-
-      if (insertError) {
-        // log chi tiết để debug (Network tab có thể cũng show)
-        console.error("Insert quiz error (raw):", insertError)
-        // convert PostgrestError sang Error để catch xử lý nhất quán
-        throw new Error(insertError.message ?? JSON.stringify(insertError))
-      }
-
-      console.log("Inserted quiz:", inserted)
-
-      // Reset form
-      setTitle("")
-      setDescription("")
-
-      onSuccess?.()
+      // reset form
+      setTitle(""); setDescription(""); setQuestion("");
+      setOptionA(""); setOptionB(""); setOptionC(""); setOptionD(""); setCorrect("A");
+      alert("Quiz + Question created successfully!")
     } catch (err: unknown) {
-      console.error("Create quiz failed:", err)
-      const msg =
-        err instanceof Error ? err.message : JSON.stringify(err, Object.getOwnPropertyNames(err))
-      setError(msg || "An error occurred")
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-gray-900">
-          <Plus className="w-5 h-5" />
-          Create New Quiz
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-medium text-gray-700">
-              Quiz Title *
-            </Label>
-            <Input
-              id="title"
-              placeholder="Enter quiz title..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Label>Quiz Title *</Label>
+      <Input value={title} onChange={e=>setTitle(e.target.value)} required/>
+      <Label>Description *</Label>
+      <Textarea value={description} onChange={e=>setDescription(e.target.value)} required/>
 
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Description *
-            </Label>
-            <Textarea
-              id="description"
-              placeholder="Describe what this quiz covers..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              className="min-h-20"
-            />
-          </div>
+      <Label>Question *</Label>
+      <Textarea value={question} onChange={e=>setQuestion(e.target.value)} required/>
+      <Label>Option A *</Label>
+      <Input value={optionA} onChange={e=>setOptionA(e.target.value)} required/>
+      <Label>Option B *</Label>
+      <Input value={optionB} onChange={e=>setOptionB(e.target.value)} required/>
+      <Label>Option C *</Label>
+      <Input value={optionC} onChange={e=>setOptionC(e.target.value)} required/>
+      <Label>Option D *</Label>
+      <Input value={optionD} onChange={e=>setOptionD(e.target.value)} required/>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
-          )}
+      <Label>Correct Answer *</Label>
+      <select value={correct} onChange={e=>setCorrect(e.target.value as any)}>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+        <option value="D">D</option>
+      </select>
 
-          <Button
-            type="submit"
-            disabled={isLoading || !title.trim() || !description.trim()}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Quiz
-              </>
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+      {error && <div className="text-red-600">{error}</div>}
+      <Button type="submit" disabled={isLoading}>{isLoading ? "Creating..." : "Create Quiz"}</Button>
+    </form>
   )
 }
