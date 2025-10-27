@@ -20,13 +20,10 @@ let _canvas: HTMLCanvasElement | null = null
 let _ctx: CanvasRenderingContext2D | null = null
 let _keys: Record<string, boolean> = {}
 
-function _handleKeyDown(e: KeyboardEvent) {
-  _keys[e.key] = true
-}
+function _handleKeyDown(e: KeyboardEvent) { _keys[e.key] = true }
+function _handleKeyUp(e: KeyboardEvent) { _keys[e.key] = false }
 
-function _handleKeyUp(e: KeyboardEvent) {
-  _keys[e.key] = false
-}
+let _handleQuestionInput = (e: KeyboardEvent) => {}
 
 export function destroyPlatformer() {
   if (typeof window === "undefined") return
@@ -39,8 +36,6 @@ export function destroyPlatformer() {
   _ctx = null
   _keys = {}
 }
-
-let _handleQuestionInput = (e: KeyboardEvent) => {}
 
 export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
   try {
@@ -94,9 +89,12 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
       if (isNaN(index) || index < 0 || index >= q.options.length) return
       selectedAnswer = q.options[index]
 
+      // Nếu đúng, tăng điểm và gọi onScore ngay
       if (selectedAnswer === q.correct_answer) {
         score += 10
+        opts.onScore?.(score)
       }
+
       currentQuestion++
       selectedAnswer = null
       showQuestion = false
@@ -157,6 +155,7 @@ export function initPlatformer(canvasId: string, opts: InitOpts = {}) {
           showQuestion = true
           player.x = 60
         } else {
+          // Kết thúc game → gọi onScore lần cuối
           opts.onScore?.(score)
           destroyPlatformer()
         }
