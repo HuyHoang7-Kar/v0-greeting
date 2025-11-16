@@ -41,6 +41,7 @@
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@vercel/analytics": "1.3.1",
+    "@vercel/node": "latest",
     "autoprefixer": "^10.4.20",
     "child_process": "latest",
     "class-variance-authority": "^0.7.1",
