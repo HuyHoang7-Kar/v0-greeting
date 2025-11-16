@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UserProfile {
   id: string
@@ -12,26 +11,23 @@ interface UserProfile {
 }
 
 export default function ActiveUser() {
-  const supabase = createClientComponentClient()
   const [users, setUsers] = useState<UserProfile[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchProfiles = async () => {
+      setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('profiles') // bảng public.profiles
-          .select('id, full_name, role, created_at, updated_at')
-          .order('created_at', { ascending: false })
-
-        if (error) {
-          console.error('Lỗi fetch profiles:', error.message)
-          setUsers([])
+        const res = await fetch('/api/admin/profiles')
+        const json = await res.json()
+        if (res.ok) {
+          setUsers(json.profiles ?? [])
         } else {
-          setUsers(data ?? [])
+          console.error("API error:", json.error)
+          setUsers([])
         }
       } catch (err) {
-        console.error('Lỗi fetch:', err)
+        console.error("Fetch error:", err)
         setUsers([])
       } finally {
         setLoading(false)
