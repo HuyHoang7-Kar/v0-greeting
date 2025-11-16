@@ -43,4 +43,4 @@ async function createAdmin(email: string, password: string) {
 }
 
 // Chạy tạo admin
-createAdmin("admin@example.com", "Admin@123456");
+createAdmin("phh1422005@gmail.com", "Admin@123456");
