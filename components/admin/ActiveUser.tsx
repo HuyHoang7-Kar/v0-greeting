@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UserProfile {
   id: string
@@ -11,23 +12,26 @@ interface UserProfile {
 }
 
 export default function ActiveUser() {
+  const supabase = createClientComponentClient()
   const [users, setUsers] = useState<UserProfile[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      setLoading(true)
       try {
-        const res = await fetch('/api/admin/profiles')
-        const json = await res.json()
-        if (res.ok) {
-          setUsers(json.profiles ?? [])
-        } else {
-          console.error("API error:", json.error)
+        const { data, error } = await supabase
+          .from<UserProfile>('profiles') // bảng public.profiles
+          .select('id, full_name, role, created_at, updated_at')
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Lỗi fetch profiles:', error.message)
           setUsers([])
+        } else {
+          setUsers(data ?? [])
         }
       } catch (err) {
-        console.error("Fetch error:", err)
+        console.error('Lỗi fetch:', err)
         setUsers([])
       } finally {
         setLoading(false)
@@ -41,7 +45,7 @@ export default function ActiveUser() {
   if (!users || users.length === 0) return <div>Hiện chưa có profile nào.</div>
 
   return (
-    <div>
+    <div className="overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4">📜 Thông tin người dùng</h2>
       <table className="w-full border-collapse border border-gray-300">
         <thead>
