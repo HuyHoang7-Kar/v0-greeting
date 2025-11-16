@@ -19,13 +19,12 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState<'student' | 'teacher'>('student')
+  const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // serverUpsertProfile can accept either id or email
   async function serverUpsertProfile(opts: { id?: string; email?: string }) {
     try {
       const res = await fetch('/api/internal/upsert-profile', {
@@ -45,7 +44,6 @@ export default function SignUpPage() {
     }
   }
 
-  // helper: retry polling for user/profile readiness
   async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const res = await serverUpsertProfile({ email: emailToCheck })
@@ -53,11 +51,9 @@ export default function SignUpPage() {
         return { ok: true, profile: res.body.profile ?? null }
       }
       if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
-        // wait then retry
         await new Promise((r) => setTimeout(r, delayMs))
         continue
       }
-      // other errors -> return
       return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
     }
     return { ok: false, error: 'timeout_waiting_for_user', status: 408 }
@@ -92,33 +88,24 @@ export default function SignUpPage() {
         options: signupOptions,
       } as any)
 
-      console.debug('signUp response:', signUpData, signUpError)
-
       if (signUpError) {
-        console.error('SignUp Error:', signUpError)
         setError(signUpError.message ?? 'Đăng ký thất bại, vui lòng thử lại.')
         setIsLoading(false)
         return
       }
 
       const userId = signUpData?.user?.id ?? null
-
       if (userId) {
-        // if SDK returned user id immediately, upsert with id
         const res = await serverUpsertProfile({ id: userId })
         if (!res.ok) console.warn('server upsert-profile (by id) failed', res)
       } else {
-        // If no id returned (email confirmation flow), call server with email and retry polling
         const res = await tryUpsertWithRetry(email)
-        if (!res.ok) {
-          console.warn('server upsert-profile (by email) failed or timed out', res)
-        }
+        if (!res.ok) console.warn('server upsert-profile (by email) failed or timed out', res)
       }
 
       setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
       router.push('/auth/signup-success')
     } catch (err: unknown) {
-      console.error('Signup Catch Error:', err)
       setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi')
     } finally {
       setIsLoading(false)
@@ -162,13 +149,14 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="role">Tôi là</Label>
-                <Select value={role} onValueChange={(value: 'student' | 'teacher') => setRole(value)}>
+                <Select value={role} onValueChange={(value: 'student' | 'teacher' | 'admin') => setRole(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn vai trò của bạn" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học Sinh</SelectItem>
                     <SelectItem value="teacher">Giáo Viên</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
