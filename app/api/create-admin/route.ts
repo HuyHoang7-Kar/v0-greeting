@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// ⚠️ Server-side client, dùng Service Role Key
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,     
-  process.env.SUPABASE_SERVICE_ROLE_KEY   // <-- dùng service role key
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!, 
+  {
+    auth: {
+      persistSession: false   // 👈 BẮT BUỘC CHO SERVICE ROLE KEY
+    }
+  }
 );
 
 export async function POST() {
+  console.log("📌 Service Role Key loaded:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
   const email = "phh1422005@gmail.com";
   const password = "123456";
   const username = "admin";
@@ -16,7 +22,6 @@ export async function POST() {
   try {
     console.log("🚀 Bắt đầu tạo auth user admin...");
 
-    // 1️⃣ Tạo auth user
     const { data: userData, error: userError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -24,14 +29,18 @@ export async function POST() {
       user_metadata: { role: "admin" },
     });
 
-    if (userError || !userData.user) {
-      return NextResponse.json({ error: userError?.message || "Không tạo được user" }, { status: 400 });
+    console.log("👉 userData:", userData);
+    console.log("👉 userError:", userError);
+
+    if (userError || !userData?.user) {
+      return NextResponse.json(
+        { error: userError?.message || "Không tạo được user" },
+        { status: 400 }
+      );
     }
 
     const userId = userData.user.id;
-    console.log("✅ User tạo thành công:", userData.user);
 
-    // 2️⃣ Tạo profile admin
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .insert({
@@ -44,11 +53,12 @@ export async function POST() {
       })
       .select();
 
+    console.log("👉 profileData:", profileData);
+    console.log("👉 profileError:", profileError);
+
     if (profileError) {
       return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
-
-    console.log("✅ Profile admin đã được tạo:", profileData);
 
     return NextResponse.json({
       message: "Admin user và profile đã được tạo thành công!",
@@ -56,6 +66,6 @@ export async function POST() {
       profile: profileData,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Lỗi không xác định" }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
