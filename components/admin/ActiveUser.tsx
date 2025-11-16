@@ -5,7 +5,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UserProfile {
   id: string
-  email?: string
   full_name: string
   role: string
   created_at: string
@@ -14,24 +13,26 @@ interface UserProfile {
 
 export default function ActiveUser() {
   const supabase = createClientComponentClient()
-  const [users, setUsers] = useState<UserProfile[]>([])
+  const [users, setUsers] = useState<UserProfile[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
         const { data, error } = await supabase
-          .from('profiles')
+          .from('profiles') // bảng public.profiles
           .select('id, full_name, role, created_at, updated_at')
           .order('created_at', { ascending: false })
 
         if (error) {
           console.error('Lỗi fetch profiles:', error.message)
-        } else if (data) {
-          setUsers(data as UserProfile[])
+          setUsers([])
+        } else {
+          setUsers(data ?? [])
         }
       } catch (err) {
         console.error('Lỗi fetch:', err)
+        setUsers([])
       } finally {
         setLoading(false)
       }
@@ -40,8 +41,8 @@ export default function ActiveUser() {
     fetchProfiles()
   }, [])
 
-  if (loading) return <div>Loading...</div>
-  if (!users.length) return <div>Chưa có dữ liệu profile nào.</div>
+  if (loading) return <div>Đang tải dữ liệu...</div>
+  if (!users || users.length === 0) return <div>Hiện chưa có profile nào.</div>
 
   return (
     <div>
