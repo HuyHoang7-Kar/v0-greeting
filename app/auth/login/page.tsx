@@ -1,54 +1,73 @@
-"use client"
+'use client'
 
-import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 1️⃣ Đăng nhập user
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        // Lỗi đăng nhập (sai pass, email chưa xác thực, ...)
-        console.error("Supabase login error:", error)
-        setError(error.message)
+      if (signInError) {
+        console.error('Supabase login error:', signInError)
+        setError(signInError.message)
         return
       }
 
-      if (!data.user) {
-        setError("Không tìm thấy người dùng. Vui lòng thử lại.")
+      if (!signInData.user) {
+        setError('Không tìm thấy người dùng. Vui lòng thử lại.')
         return
       }
 
-      console.log("Login success:", data.user)
+      const userId = signInData.user.id
 
-      // ✅ Đăng nhập thành công → chuyển hướng
-      router.push("/dashboard")
+      // 2️⃣ Lấy thông tin profile từ bảng profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', userId)
+        .single()
+
+      if (profileError) {
+        console.warn('Không lấy được profile:', profileError)
+        // Nếu muốn, vẫn có thể cho login nhưng role sẽ mặc định
+      }
+
+      console.log('Login success:', { user: signInData.user, profile: profileData })
+
+      // 3️⃣ Lưu role vào localStorage (hoặc state global) nếu cần
+      if (profileData?.role) {
+        localStorage.setItem('role', profileData.role)
+        localStorage.setItem('full_name', profileData.full_name)
+      }
+
+      // 4️⃣ Chuyển hướng
+      router.push('/dashboard')
     } catch (err: any) {
-      console.error("Unexpected error:", err)
-      setError(err?.message || "Đã xảy ra lỗi không xác định")
+      console.error('Unexpected error:', err)
+      setError(err?.message || 'Đã xảy ra lỗi không xác định')
     } finally {
       setIsLoading(false)
     }
@@ -103,12 +122,12 @@ export default function LoginPage() {
                 className="w-full h-11 bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
                 disabled={isLoading}
               >
-                {isLoading ? "Đang đăng nhập..." : "Đăng Nhập"}
+                {isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
               </Button>
             </form>
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                {"Chưa có tài khoản? "}
+                Chưa có tài khoản?{' '}
                 <Link href="/auth/signup" className="font-medium text-yellow-600 hover:text-yellow-500">
                   Đăng ký tại đây
                 </Link>
