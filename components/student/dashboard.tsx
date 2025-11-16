@@ -14,8 +14,8 @@ import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
 import { Leaderboard } from "@/components/rewards/leaderboard"
 import { UserProfile } from "@/components/rewards/user-profile"
-import { BookOpen, Brain, FileText, TrendingUp, Play, LogOut, User, Gamepad2, Trophy, Medal } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { BookOpen, Brain, FileText, TrendingUp, Play, LogOut, User, Gamepad2, Trophy, Medal } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface Profile {
   id: string
@@ -40,20 +40,6 @@ export function StudentDashboard() {
   const router = useRouter()
 
   const supabase = createClient()
-
-  const colorClasses = {
-    yellow: "border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100",
-    blue: "border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100",
-    green: "border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100",
-    purple: "border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100",
-  }
-
-  const iconColorClasses = {
-    yellow: "text-yellow-600",
-    blue: "text-blue-600",
-    green: "text-green-600",
-    purple: "text-purple-600",
-  }
 
   useEffect(() => {
     loadDashboardData()
@@ -94,7 +80,8 @@ export function StudentDashboard() {
       const { data: resultsData } = await supabase
         .from("results")
         .select(
-          `*
+          `
+          *,
           quizzes ( title )
         `
         )
@@ -193,14 +180,14 @@ export function StudentDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {[
-            { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" as const },
-            { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" as const },
-            { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" as const },
-            { label: "Điểm Tổng", value: userPoints?.total_points || 0, icon: Trophy, color: "purple" as const },
+            { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" },
+            { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" },
+            { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" },
+            { label: "Điểm Tổng", value: userPoints?.total_points || 0, icon: Trophy, color: "purple" },
           ].map(({ label, value, icon: Icon, color }, idx) => (
             <Card
               key={idx}
-              className={colorClasses[color]}
+              className={`border-2 border-${color}-200 bg-gradient-to-br from-${color}-50 to-${color}-100`}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -208,7 +195,7 @@ export function StudentDashboard() {
                     <p className="text-sm font-medium text-gray-600">{label}</p>
                     <p className="text-3xl font-bold text-gray-900">{value}</p>
                   </div>
-                  <Icon className={`w-8 h-8 ${iconColorClasses[color]}`} />
+                  <Icon className={`w-8 h-8 text-${color}-600`} />
                 </div>
               </CardContent>
             </Card>
