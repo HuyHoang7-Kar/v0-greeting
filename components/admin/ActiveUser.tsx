@@ -1,11 +1,12 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useEffect, useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UserProfile {
   id: string
   email: string
+  full_name: string
   role: string
   created_at: string
   updated_at: string
@@ -20,14 +21,32 @@ export default function ActiveUser() {
     const fetchProfiles = async () => {
       try {
         const { data, error } = await supabase
-          .from("profiles")
-          .select("id, email, role, created_at, updated_at")
-          .order("created_at", { ascending: false })
+          .from('profile.public')
+          .select(`
+            id,
+            full_name,
+            role,
+            created_at,
+            updated_at,
+            auth_user:auth.users!inner(email)
+          `)
+          .order('created_at', { ascending: false })
 
-        if (error) console.error("Lỗi fetch profiles:", error.message)
-        else if (data) setUsers(data)
+        if (error) console.error('Lỗi fetch profiles:', error.message)
+        else if (data) {
+          // map lại email từ auth_user
+          const mapped = data.map((u: any) => ({
+            id: u.id,
+            full_name: u.full_name,
+            role: u.role,
+            created_at: u.created_at,
+            updated_at: u.updated_at,
+            email: u.auth_user.email,
+          }))
+          setUsers(mapped)
+        }
       } catch (err) {
-        console.error("Lỗi fetch:", err)
+        console.error('Lỗi fetch:', err)
       } finally {
         setLoading(false)
       }
@@ -35,8 +54,6 @@ export default function ActiveUser() {
 
     fetchProfiles()
   }, [])
-
-  console.log(users) // debug dữ liệu
 
   if (loading) return <div>Loading...</div>
   if (!users.length) return <div>Chưa có dữ liệu profile nào.</div>
@@ -48,15 +65,17 @@ export default function ActiveUser() {
         <thead>
           <tr className="bg-gray-100">
             <th className="border px-3 py-1">Email</th>
+            <th className="border px-3 py-1">Họ và Tên</th>
             <th className="border px-3 py-1">Role</th>
-            <th className="border px-3 py-1">Created At</th>
-            <th className="border px-3 py-1">Updated At</th>
+            <th className="border px-3 py-1">Ngày tạo</th>
+            <th className="border px-3 py-1">Cập nhật lần cuối</th>
           </tr>
         </thead>
         <tbody>
           {users.map((user) => (
             <tr key={user.id}>
               <td className="border px-3 py-1">{user.email}</td>
+              <td className="border px-3 py-1">{user.full_name}</td>
               <td className="border px-3 py-1">{user.role}</td>
               <td className="border px-3 py-1">{new Date(user.created_at).toLocaleString()}</td>
               <td className="border px-3 py-1">{new Date(user.updated_at).toLocaleString()}</td>
