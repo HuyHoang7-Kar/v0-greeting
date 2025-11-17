@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createUser } from "./api/create-user"
+import { deleteUser } from "./api/delete-user"
 
 interface UserProfile {
   id: string
   email: string
+  full_name: string
   role: string
 }
 
@@ -13,14 +16,16 @@ export default function UserManagement() {
   const supabase = createClientComponentClient()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+
   const [newEmail, setNewEmail] = useState("")
+  const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
   const fetchUsers = async () => {
     setLoading(true)
-    const { data, error } = await supabase.from("profiles").select("*")
+    const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
     if (error) console.error("Error fetching users:", error)
-    else setUsers(data)
+    else setUsers(data ?? [])
     setLoading(false)
   }
 
@@ -29,21 +34,26 @@ export default function UserManagement() {
   }, [])
 
   const handleAddUser = async () => {
-    if (!newEmail) return alert("Email không được để trống")
-    const { error } = await supabase.from("profiles").insert([{ email: newEmail, role: newRole }])
-    if (error) alert("Thêm user thất bại: " + error.message)
-    else {
+    if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
+    try {
+      await createUser(newEmail, newFullName, newRole)
       setNewEmail("")
+      setNewFullName("")
       setNewRole("student")
       fetchUsers()
+    } catch (err: any) {
+      alert("Thêm user thất bại: " + err.message)
     }
   }
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
-    const { error } = await supabase.from("profiles").delete().eq("id", id)
-    if (error) alert("Xóa thất bại: " + error.message)
-    else fetchUsers()
+    try {
+      await deleteUser(id)
+      fetchUsers()
+    } catch (err: any) {
+      alert("Xóa thất bại: " + err.message)
+    }
   }
 
   const handleUpdateRole = async (id: string, role: string) => {
@@ -65,6 +75,13 @@ export default function UserManagement() {
           placeholder="Email"
           value={newEmail}
           onChange={(e) => setNewEmail(e.target.value)}
+          className="border px-3 py-1 rounded"
+        />
+        <input
+          type="text"
+          placeholder="Họ và tên"
+          value={newFullName}
+          onChange={(e) => setNewFullName(e.target.value)}
           className="border px-3 py-1 rounded"
         />
         <select
@@ -89,6 +106,7 @@ export default function UserManagement() {
         <thead>
           <tr className="bg-gray-100">
             <th className="border px-3 py-1">Email</th>
+            <th className="border px-3 py-1">Họ và Tên</th>
             <th className="border px-3 py-1">Role</th>
             <th className="border px-3 py-1">Actions</th>
           </tr>
@@ -97,6 +115,7 @@ export default function UserManagement() {
           {users.map((user) => (
             <tr key={user.id}>
               <td className="border px-3 py-1">{user.email}</td>
+              <td className="border px-3 py-1">{user.full_name}</td>
               <td className="border px-3 py-1">
                 <select
                   value={user.role}
