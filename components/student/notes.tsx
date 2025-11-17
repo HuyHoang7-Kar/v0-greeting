@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,28 +15,49 @@ interface Note {
   user_id: string
 }
 
-interface StudentNotesProps {
-  notes: Note[]
-  onNotesChange: () => void
-}
+export function StudentNotes() {
+  const supabase = createClient()
 
-export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
+  const [notes, setNotes] = useState<Note[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newNoteContent, setNewNoteContent] = useState("")
   const [editNoteContent, setEditNoteContent] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const supabase = createClient()
+  // Fetch notes của user hiện tại
+  const fetchNotes = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) return
 
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+      setNotes(data || [])
+    } catch (err) {
+      console.error("❌ Error fetching notes:", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchNotes()
+  }, [])
+
+  // Create note
   const handleCreateNote = async () => {
     if (!newNoteContent.trim()) return
     setIsLoading(true)
 
     try {
-      const { data, error: userError } = await supabase.auth.getUser()
-      const user = data?.user
-      if (userError || !user) throw new Error("User not authenticated")
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) throw new Error("User not authenticated")
 
       const { error } = await supabase.from("notes").insert({
         content: newNoteContent.trim(),
@@ -47,7 +68,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
 
       setNewNoteContent("")
       setIsCreating(false)
-      onNotesChange()
+      fetchNotes() // reload notes
     } catch (err) {
       console.error("❌ Error creating note:", err)
     } finally {
@@ -55,6 +76,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
     }
   }
 
+  // Update note
   const handleUpdateNote = async (id: string) => {
     if (!editNoteContent.trim()) return
     setIsLoading(true)
@@ -71,7 +93,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
       if (error) throw error
 
       setEditingId(null)
-      onNotesChange()
+      fetchNotes()
     } catch (err) {
       console.error("❌ Error updating note:", err)
     } finally {
@@ -79,6 +101,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
     }
   }
 
+  // Delete note
   const handleDeleteNote = async (id: string) => {
     if (!confirm("Are you sure you want to delete this note?")) return
     setIsLoading(true)
@@ -86,7 +109,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
     try {
       const { error } = await supabase.from("notes").delete().eq("id", id)
       if (error) throw error
-      onNotesChange()
+      fetchNotes()
     } catch (err) {
       console.error("❌ Error deleting note:", err)
     } finally {
@@ -101,7 +124,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
 
   return (
     <div className="space-y-6">
-      {/* Create Note Button */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <p className="text-gray-600">Keep track of important study notes.</p>
         <Button
@@ -159,12 +182,12 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {notes.map((note) => (
             <Card key={note.id} className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3 flex justify-between items-center">
+              <CardHeader className="pb-3 flex justify-between items-start">
                 {editingId === note.id ? (
                   <Textarea
                     value={editNoteContent}
                     onChange={(e) => setEditNoteContent(e.target.value)}
-                    className="min-h-24"
+                    className="min-h-24 w-full"
                   />
                 ) : (
                   <p className="text-gray-900">{note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}</p>
