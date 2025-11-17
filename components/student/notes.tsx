@@ -2,15 +2,13 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { Plus, Edit, Trash2, Save, X, FileText } from "lucide-react"
 
 interface Note {
   id: string
-  title: string
   content: string
   created_at: string
   updated_at: string
@@ -25,29 +23,29 @@ interface StudentNotesProps {
 export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [newNote, setNewNote] = useState({ title: "", content: "" })
-  const [editNote, setEditNote] = useState({ title: "", content: "" })
+  const [newNoteContent, setNewNoteContent] = useState("")
+  const [editNoteContent, setEditNoteContent] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
   const supabase = createClient()
 
   const handleCreateNote = async () => {
-    if (!newNote.title.trim() || !newNote.content.trim()) return
+    if (!newNoteContent.trim()) return
     setIsLoading(true)
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      const { data, error: userError } = await supabase.auth.getUser()
+      const user = data?.user
       if (userError || !user) throw new Error("User not authenticated")
 
       const { error } = await supabase.from("notes").insert({
-        title: newNote.title.trim(),
-        content: newNote.content.trim(),
+        content: newNoteContent.trim(),
         user_id: user.id,
       })
 
       if (error) throw error
 
-      setNewNote({ title: "", content: "" })
+      setNewNoteContent("")
       setIsCreating(false)
       onNotesChange()
     } catch (err) {
@@ -58,15 +56,14 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
   }
 
   const handleUpdateNote = async (id: string) => {
-    if (!editNote.title.trim() || !editNote.content.trim()) return
+    if (!editNoteContent.trim()) return
     setIsLoading(true)
 
     try {
       const { error } = await supabase
         .from("notes")
         .update({
-          title: editNote.title.trim(),
-          content: editNote.content.trim(),
+          content: editNoteContent.trim(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -99,7 +96,7 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
 
   const startEditing = (note: Note) => {
     setEditingId(note.id)
-    setEditNote({ title: note.title, content: note.content })
+    setEditNoteContent(note.content)
   }
 
   return (
@@ -119,31 +116,17 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
       {/* Create Note Form */}
       {isCreating && (
         <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              Create New Note
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsCreating(false)
-                  setNewNote({ title: "", content: "" })
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </CardTitle>
+          <CardHeader className="flex justify-between items-center">
+            <p>Create New Note</p>
+            <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)}>
+              <X className="w-4 h-4" />
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input
-              placeholder="Note title..."
-              value={newNote.title}
-              onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
-            />
             <Textarea
               placeholder="Write your note here..."
-              value={newNote.content}
-              onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+              value={newNoteContent}
+              onChange={(e) => setNewNoteContent(e.target.value)}
               className="min-h-32"
             />
             <div className="flex gap-2">
@@ -176,62 +159,39 @@ export function StudentNotes({ notes, onNotesChange }: StudentNotesProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {notes.map((note) => (
             <Card key={note.id} className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  {editingId === note.id ? (
-                    <Input
-                      value={editNote.title}
-                      onChange={(e) => setEditNote({ ...editNote, title: e.target.value })}
-                      className="font-semibold"
-                    />
-                  ) : (
-                    <CardTitle className="text-lg text-gray-900">{note.title}</CardTitle>
-                  )}
-                  <div className="flex gap-1">
-                    {editingId === note.id ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleUpdateNote(note.id)}
-                          disabled={isLoading}
-                        >
-                          <Save className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => startEditing(note)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteNote(note.id)}
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
+              <CardHeader className="pb-3 flex justify-between items-center">
                 {editingId === note.id ? (
                   <Textarea
-                    value={editNote.content}
-                    onChange={(e) => setEditNote({ ...editNote, content: e.target.value })}
+                    value={editNoteContent}
+                    onChange={(e) => setEditNoteContent(e.target.value)}
                     className="min-h-24"
                   />
                 ) : (
-                  <p className="text-gray-700 text-sm leading-relaxed">
-                    {note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}
-                  </p>
+                  <p className="text-gray-900">{note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}</p>
                 )}
+                <div className="flex gap-1">
+                  {editingId === note.id ? (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => handleUpdateNote(note.id)} disabled={isLoading}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => startEditing(note)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteNote(note.id)} disabled={isLoading}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
                 <p className="text-xs text-gray-500 mt-3">
                   Updated {new Date(note.updated_at).toLocaleDateString()}
                 </p>
