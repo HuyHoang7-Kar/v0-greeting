@@ -3,14 +3,19 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Gamepad2, Brain, Calculator, Link, Rocket } from "lucide-react"
 
-// 4 trò còn lại
+// Import các trò chơi
 import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
+
+// Default questions cho Memory Match để tránh crash
+const defaultMemoryQuestions = [
+  { id: "1", question: "2+2", correct_answer: "4", options: ["2","3","4","5"], points: 10 },
+  { id: "2", question: "Capital of France?", correct_answer: "Paris", options: ["Paris","London","Rome","Berlin"], points: 10 },
+]
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -22,6 +27,7 @@ export function GameHub() {
       description: "Lật thẻ tìm cặp giống nhau.",
       icon: Brain,
       component: MemoryMatchGame,
+      props: { gameId: "memory-1", questions: defaultMemoryQuestions },
     },
     {
       id: "word-meaning",
@@ -29,6 +35,7 @@ export function GameHub() {
       description: "Ghép từ với nghĩa đúng.",
       icon: Link,
       component: WordMeaningMatchGame,
+      props: {}, // thêm default props nếu cần
     },
     {
       id: "math",
@@ -36,6 +43,7 @@ export function GameHub() {
       description: "Tính toán nhanh để ghi điểm.",
       icon: Calculator,
       component: MathCalculatorGame,
+      props: {}, // thêm default props nếu cần
     },
     {
       id: "platformer",
@@ -43,23 +51,24 @@ export function GameHub() {
       description: "Chạy nhảy và trả lời câu hỏi.",
       icon: Rocket,
       component: PlatformerGame,
+      props: {}, // thêm default props nếu cần
     },
   ]
 
   const selected = games.find((g) => g.id === selectedGame)
 
-  if (selected) {
+  // Nếu đã chọn game
+  if (selected && selected.component) {
     const GameComponent = selected.component
     return (
       <div className="space-y-4">
-        <Button variant="outline" onClick={() => setSelectedGame(null)}>
-          ← Quay lại
-        </Button>
-        <GameComponent />
+        <Button variant="outline" onClick={() => setSelectedGame(null)}>← Quay lại</Button>
+        <GameComponent {...selected.props} />
       </div>
     )
   }
 
+  // Hiển thị list game
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
