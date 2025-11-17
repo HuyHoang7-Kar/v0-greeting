@@ -3,31 +3,31 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Gamepad2, Brain, Calculator, Link } from "lucide-react"
+import { Gamepad2, Brain, Calculator, Link, Rocket } from "lucide-react"
 
-// Import các trò chơi
+// Trò chơi
 import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
-
-// --- Default props để tránh crash ---
-const defaultMemoryQuestions = [
-  { id: "1", question: "2+2", correct_answer: "4", options: ["2","3","4","5"], points: 10 },
-  { id: "2", question: "Capital of France?", correct_answer: "Paris", options: ["Paris","London","Rome","Berlin"], points: 10 },
-]
-
-const defaultWordPairs = [
-  { id: "1", word: "Cat", meaning: "Con mèo" },
-  { id: "2", word: "Dog", meaning: "Con chó" },
-]
-
-const defaultMathOperations = [
-  { id: "1", expression: "5+7", answer: 12 },
-  { id: "2", expression: "9-3", answer: 6 },
-]
+import { PlatformerGame } from "./platformer-game"
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
+
+  const defaultMemoryQuestions = [
+    { id: "1", question: "2+2", correct_answer: "4", options: ["2","3","4","5"], points: 10 },
+    { id: "2", question: "Capital of France?", correct_answer: "Paris", options: ["Paris","London","Rome","Berlin"], points: 10 },
+  ]
+
+  const defaultWordPairs = [
+    { id: "1", word: "Cat", meaning: "Con mèo" },
+    { id: "2", word: "Dog", meaning: "Con chó" },
+  ]
+
+  const defaultMathOperations = [
+    { id: "1", expression: "5+7", answer: 12 },
+    { id: "2", expression: "9-3", answer: 6 },
+  ]
 
   const games = [
     {
@@ -66,6 +66,14 @@ export function GameHub() {
         onGameComplete: (score: number) => console.log("Math Calculator score:", score)
       },
     },
+    {
+      id: "platformer",
+      name: "Platformer Game",
+      description: "Chạy nhảy và trả lời câu hỏi.",
+      icon: Rocket,
+      component: PlatformerGame,
+      // KHÔNG set default props → sẽ dùng props thực tế khi render
+    },
   ]
 
   const selected = games.find((g) => g.id === selectedGame)
@@ -75,7 +83,7 @@ export function GameHub() {
     return (
       <div className="space-y-4">
         <Button variant="outline" onClick={() => setSelectedGame(null)}>← Quay lại</Button>
-        <GameComponent {...selected.props} />
+        <GameComponent {...(selected.props ?? {})} />
       </div>
     )
   }
