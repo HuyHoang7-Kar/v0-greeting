@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Trophy, Clock, Star } from "lucide-react"
+import { initMemoryMatchScene, destroyMemoryMatchScene, showConfetti } from "@/scripts/memory-match"
 
-// Dữ liệu câu hỏi tương thích database hiện tại
+// Dữ liệu câu hỏi
 interface GameQuestion {
   id: string
   question: string
   correct_answer: string
-  options: string[]       // option_a..d từ quiz_questions hoặc [question, answer] từ flashcards
-  points?: number         // mặc định 10
+  options: string[]
+  points?: number
 }
 
 interface MemoryCard {
@@ -39,27 +40,19 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
   const [gameStarted, setGameStarted] = useState(false)
   const [gameEnded, setGameEnded] = useState(false)
 
+  // Khởi tạo canvas confetti
+  useEffect(() => {
+    initMemoryMatchScene()
+    return () => destroyMemoryMatchScene()
+  }, [])
+
   // Khởi tạo thẻ từ questions
   useEffect(() => {
     const gameCards: MemoryCard[] = []
     questions.forEach((q, index) => {
-      gameCards.push({
-        id: `q-${index}`,
-        content: q.question,
-        type: "question",
-        matched: false,
-        flipped: false,
-      })
-      gameCards.push({
-        id: `a-${index}`,
-        content: q.correct_answer,
-        type: "answer",
-        matched: false,
-        flipped: false,
-      })
+      gameCards.push({ id: `q-${index}`, content: q.question, type: "question", matched: false, flipped: false })
+      gameCards.push({ id: `a-${index}`, content: q.correct_answer, type: "answer", matched: false, flipped: false })
     })
-
-    // Shuffle
     setCards(gameCards.sort(() => Math.random() - 0.5))
   }, [questions])
 
@@ -81,7 +74,7 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
   const handleCardClick = (cardId: string) => {
     if (!gameStarted || gameEnded || flippedCards.length >= 2) return
 
-    const card = cards.find((c) => c.id === cardId)
+    const card = cards.find(c => c.id === cardId)
     if (!card || card.matched || card.flipped) return
 
     const newFlippedCards = [...flippedCards, cardId]
@@ -89,7 +82,7 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, flipped: true } : c))
 
     if (newFlippedCards.length === 2) {
-      setTimeout(() => checkMatch(newFlippedCards), 1000)
+      setTimeout(() => checkMatch(newFlippedCards), 800)
     }
   }
 
@@ -102,7 +95,6 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
 
     const questionIndex1 = card1.id.split("-")[1]
     const questionIndex2 = card2.id.split("-")[1]
-
     const isMatch = questionIndex1 === questionIndex2 && card1.type !== card2.type
 
     if (isMatch) {
@@ -114,11 +106,14 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
       setScore(prev => prev + (questionData.points ?? 10))
       setMatchedPairs(prev => prev + 1)
 
+      // Confetti khi ghép đúng
+      showConfetti()
+
       if (matchedPairs + 1 === questions.length) {
         setTimeout(() => endGame(), 500)
       }
     } else {
-      // flip back
+      // Flip back
       setCards(prev =>
         prev.map(c => (c.id === card1Id || c.id === card2Id ? { ...c, flipped: false } : c))
       )
@@ -129,6 +124,7 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
 
   const endGame = () => {
     setGameEnded(true)
+    showConfetti() // Confetti final khi kết thúc
     const maxScore = questions.reduce((sum, q) => sum + (q.points ?? 10), 0)
     const timeTaken = 120 - timeLeft
     onGameComplete(score, maxScore, timeTaken, score)
@@ -147,9 +143,7 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
           <div className="flex items-center space-x-2"><Clock className="w-4 h-4" /><span>2 phút</span></div>
           <div className="flex items-center space-x-2"><Star className="w-4 h-4" /><span>{questions.length} cặp thẻ</span></div>
         </div>
-        <Button onClick={startGame} size="lg" className="bg-yellow-500 hover:bg-yellow-600">
-          Bắt đầu chơi
-        </Button>
+        <Button onClick={startGame} size="lg" className="bg-yellow-500 hover:bg-yellow-600">Bắt đầu chơi</Button>
       </div>
     )
   }
@@ -162,16 +156,12 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
         <div className="space-y-2">
           <Trophy className="w-16 h-16 text-yellow-500 mx-auto" />
           <h2 className="text-2xl font-bold text-gray-900">Hoàn thành!</h2>
-          <p className="text-gray-600">
-            Bạn đã ghép được {matchedPairs}/{questions.length} cặp thẻ
-          </p>
+          <p className="text-gray-600">Bạn đã ghép được {matchedPairs}/{questions.length} cặp thẻ</p>
         </div>
         <div className="space-y-4">
           <div className="text-3xl font-bold text-yellow-600">{score} điểm</div>
           <div className="text-sm text-gray-500">({percentage}% chính xác)</div>
-          <div className="text-sm text-gray-500">
-            Thời gian: {Math.floor((120 - timeLeft) / 60)}:{((120 - timeLeft) % 60).toString().padStart(2, "0")}
-          </div>
+          <div className="text-sm text-gray-500">Thời gian: {Math.floor((120 - timeLeft)/60)}:{((120 - timeLeft)%60).toString().padStart(2,"0")}</div>
         </div>
         <Button onClick={() => window.location.reload()} variant="outline">Chơi lại</Button>
       </div>
@@ -179,12 +169,12 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-gray-900">Ghép thẻ ghi nhớ</h2>
           <div className="flex items-center space-x-4 text-sm text-gray-500">
-            <div className="flex items-center space-x-1"><Clock className="w-4 h-4" /><span>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2,"0")}</span></div>
+            <div className="flex items-center space-x-1"><Clock className="w-4 h-4" /><span>{Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,"0")}</span></div>
             <div className="flex items-center space-x-1"><Star className="w-4 h-4" /><span>{score} điểm</span></div>
           </div>
         </div>
@@ -206,7 +196,7 @@ export function MemoryMatchGame({ gameId, questions, onGameComplete }: MemoryMat
             <CardContent className="p-2 h-full flex items-center justify-center">
               {card.flipped || card.matched ? (
                 <div className="text-center">
-                  <div className={`text-xs font-medium ${card.type === "question" ? "text-blue-600" : "text-green-600"}`}>{card.type === "question" ? "Câu hỏi" : "Đáp án"}</div>
+                  <div className={`text-xs font-medium ${card.type==="question"?"text-blue-600":"text-green-600"}`}>{card.type==="question"?"Câu hỏi":"Đáp án"}</div>
                   <div className="text-sm mt-1 text-balance">{card.content}</div>
                 </div>
               ) : <div className="text-2xl text-gray-400">?</div>}
