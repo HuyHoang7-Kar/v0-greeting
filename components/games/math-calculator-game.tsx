@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Clock, Star, Calculator, CheckCircle, XCircle } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Trophy, CheckCircle, XCircle } from "lucide-react";
 
 interface GameQuestion {
   id: string;
@@ -17,12 +16,24 @@ interface GameQuestion {
 }
 
 interface MathCalculatorGameProps {
-  gameId: string;
-  questions: GameQuestion[];
-  onGameComplete: (score: number, maxScore: number, timeTaken: number, pointsEarned: number) => void;
+  gameId?: string;
+  questions?: GameQuestion[];
+  onGameComplete?: (score: number, maxScore: number, timeTaken: number, pointsEarned: number) => void;
 }
 
-export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCalculatorGameProps) {
+// Default questions
+const defaultQuestions: GameQuestion[] = [
+  { id: "1", question: "5 + 3", correct_answer: "8", points: 10 },
+  { id: "2", question: "7 - 4", correct_answer: "3", points: 10 },
+  { id: "3", question: "6 * 2", correct_answer: "12", points: 10 },
+  { id: "4", question: "12 / 3", correct_answer: "4", points: 10 },
+];
+
+export function MathCalculatorGame({
+  gameId = "default-math-game",
+  questions = defaultQuestions,
+  onGameComplete = () => {},
+}: MathCalculatorGameProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState("");
   const [score, setScore] = useState(0);
@@ -31,10 +42,6 @@ export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCa
   const [gameEnded, setGameEnded] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [calculatorDisplay, setCalculatorDisplay] = useState("0");
-  const [operation, setOperation] = useState<string | null>(null);
-  const [previousValue, setPreviousValue] = useState<number | null>(null);
-  const supabase = createClient();
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -53,35 +60,9 @@ export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCa
     return () => clearInterval(timer);
   }, [gameStarted, gameEnded]);
 
-  const handleCalculatorInput = (value: string) => {
-    if (value === "C") {
-      setCalculatorDisplay("0");
-      setOperation(null);
-      setPreviousValue(null);
-    } else if (value === "=" && operation && previousValue !== null) {
-      const current = parseFloat(calculatorDisplay);
-      let result = 0;
-      switch (operation) {
-        case "+": result = previousValue + current; break;
-        case "-": result = previousValue - current; break;
-        case "*": result = previousValue * current; break;
-        case "/": result = previousValue / current; break;
-      }
-      setCalculatorDisplay(result.toString());
-      setUserAnswer(result.toString());
-      setOperation(null);
-      setPreviousValue(null);
-    } else if (["+", "-", "*", "/"].includes(value)) {
-      setOperation(value);
-      setPreviousValue(parseFloat(calculatorDisplay));
-      setCalculatorDisplay("0");
-    } else {
-      setCalculatorDisplay((prev) => (prev === "0" ? value : prev + value));
-    }
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!userAnswer.trim()) return;
+
     const correct = Math.abs(parseFloat(userAnswer) - parseFloat(currentQuestion.correct_answer)) < 0.01;
     setIsCorrect(correct);
     setShowResult(true);
@@ -91,96 +72,16 @@ export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCa
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setUserAnswer("");
-        setCalculatorDisplay("0");
-        setOperation(null);
-        setPreviousValue(null);
         setShowResult(false);
         setIsCorrect(null);
       } else endGame();
     }, 1200);
   };
 
-  const endGame = async () => {
+  const endGame = () => {
     setGameEnded(true);
     const maxScore = questions.reduce((sum, q) => sum + q.points, 0);
     const timeTaken = 300 - timeLeft;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      if (!profile || profile.role !== "student") return;
-
-      // Tìm hoặc tạo game
-      let { data: game } = await supabase
-        .from("game")
-        .select("id")
-        .eq("slug", gameId)
-        .single();
-      if (!game) {
-        const { data: newGame } = await supabase
-          .from("game")
-          .insert({ slug: gameId, title: "Trò chơi Máy tính Toán học", description: "Luyện tính toán nhanh" })
-          .select("id")
-          .single();
-        game = newGame;
-      }
-
-      // Insert play
-      const { data: play } = await supabase
-        .from("game_plays")
-        .insert({ user_id: user.id, game_id: game.id, score })
-        .select("id")
-        .single();
-
-      // Update game_scores (best_score & plays_count)
-      const { data: existingScore } = await supabase
-        .from("game_scores")
-        .select("id,best_score,plays_count")
-        .eq("user_id", user.id)
-        .eq("game_id", game.id)
-        .single();
-
-      if (existingScore) {
-        await supabase
-          .from("game_scores")
-          .update({
-            best_score: Math.max(existingScore.best_score, score),
-            plays_count: existingScore.plays_count + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingScore.id);
-      } else {
-        await supabase
-          .from("game_scores")
-          .insert({ user_id: user.id, game_id: game.id, best_score: score, plays_count: 1 });
-      }
-
-      // Update user_totals
-      const { data: userTotal } = await supabase
-        .from("user_totals")
-        .select("total_score")
-        .eq("user_id", user.id)
-        .single();
-
-      if (userTotal) {
-        await supabase
-          .from("user_totals")
-          .update({ total_score: userTotal.total_score + score, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id);
-      } else {
-        await supabase.from("user_totals").insert({ user_id: user.id, total_score: score });
-      }
-
-    } catch (e) {
-      console.error("Error saving game result:", e);
-    }
-
     onGameComplete(score, maxScore, timeTaken, score);
   };
 
@@ -190,7 +91,7 @@ export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCa
     return (
       <div className="text-center space-y-6">
         <h2 className="text-2xl font-bold">Trò chơi Máy tính Toán học</h2>
-        <p>Giải nhanh các bài toán bằng máy tính ảo!</p>
+        <p>Giải nhanh các bài toán!</p>
         <Button onClick={() => setGameStarted(true)}>Bắt đầu</Button>
       </div>
     );
@@ -210,9 +111,6 @@ export function MathCalculatorGame({ gameId, questions, onGameComplete }: MathCa
             setTimeLeft(300);
             setCurrentQuestionIndex(0);
             setUserAnswer("");
-            setCalculatorDisplay("0");
-            setOperation(null);
-            setPreviousValue(null);
           }}
         >
           Chơi lại
