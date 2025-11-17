@@ -20,7 +20,6 @@ interface GameQuestion {
   id: string;
   question: string;
   correct_answer: string;
-  options?: string[];
   points: number;
 }
 
@@ -52,28 +51,28 @@ export function MathCalculatorGame({
   const [operation, setOperation] = useState<string | null>(null);
   const [previousValue, setPreviousValue] = useState<number | null>(null);
   const [answers, setAnswers] = useState<string[]>([]);
-  const supabase = createClient();
 
+  const supabase = createClient();
   const currentQuestion = questions[currentQuestionIndex];
 
-  // TIMER FIX - cleanup đúng cách
+  // TIMER
   useEffect(() => {
     if (!gameStarted || gameEnded) return;
 
-    let active = true;
-    const timer = setTimeout(() => {
-      if (active) setTimeLeft((t) => t - 1);
+    const timer = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          endGame();
+          return 0;
+        }
+        return t - 1;
+      });
     }, 1000);
 
-    if (timeLeft === 0) endGame();
+    return () => clearInterval(timer);
+  }, [gameStarted, gameEnded]);
 
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [gameStarted, gameEnded, timeLeft]);
-
-  // Calculator
+  // CALCULATOR
   const handleCalculatorInput = (value: string) => {
     if (value === "C") {
       setCalculatorDisplay("0");
@@ -104,14 +103,14 @@ export function MathCalculatorGame({
   };
 
   // SAVE SCORE
-  const saveGameResult = async (finalScore: number, maxScore: number, timeTaken: number) => {
+  const saveGameResult = async (finalScore: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("id, full_name, role")
         .eq("id", user.id)
         .single();
 
@@ -122,7 +121,7 @@ export function MathCalculatorGame({
         .from("game")
         .select("id")
         .eq("slug", gameId)
-        .single();
+        .maybeSingle();
 
       if (!game) {
         const { data: newGame } = await supabase
@@ -141,63 +140,59 @@ export function MathCalculatorGame({
       const { data: play } = await supabase
         .from("game_plays")
         .insert({
-          user_id: user.id,
+          user_id: profile.id,
           game_id: game.id,
           score: finalScore,
         })
         .select("id")
         .single();
 
-      // detailed scores - FIX
-      const detailedScores = questions.map((q, index) => ({
+      // detailed scores
+      const detailedScores = questions.map((q, idx) => ({
         play_id: play.id,
         question_id: q.id,
         points: q.points,
         is_correct:
-          Math.abs(
-            parseFloat(answers[index] || "0") -
-            parseFloat(q.correct_answer)
-          ) < 0.01,
+          Math.abs(parseFloat(answers[idx] || "0") - parseFloat(q.correct_answer)) < 0.01,
       }));
-
       await supabase.from("game_scores").insert(detailedScores);
 
       // update total
-      const { data: existingTotal } = await supabase
+      const { data: total } = await supabase
         .from("user_totals")
         .select("total_score,total_plays")
-        .eq("user_id", user.id)
-        .single();
+        .eq("user_id", profile.id)
+        .maybeSingle();
 
-      if (existingTotal) {
+      if (total) {
         await supabase
           .from("user_totals")
           .update({
-            total_score: existingTotal.total_score + finalScore,
-            total_plays: existingTotal.total_plays + 1,
+            total_score: total.total_score + finalScore,
+            total_plays: total.total_plays + 1,
           })
-          .eq("user_id", user.id);
+          .eq("user_id", profile.id);
       } else {
         await supabase.from("user_totals").insert({
-          user_id: user.id,
+          user_id: profile.id,
           total_score: finalScore,
           total_plays: 1,
         });
       }
-
     } catch (e) {
-      console.error("Error saving:", e);
+      console.error("Error saving game:", e);
     }
   };
 
+  // SUBMIT ANSWER
   const handleSubmit = () => {
     if (!userAnswer.trim()) return;
 
     const correct =
       Math.abs(parseFloat(userAnswer) - parseFloat(currentQuestion.correct_answer)) < 0.01;
+
     setIsCorrect(correct);
     setShowResult(true);
-
     setAnswers((prev) => [...prev, userAnswer]);
 
     if (correct) setScore((prev) => prev + currentQuestion.points);
@@ -212,51 +207,51 @@ export function MathCalculatorGame({
         setShowResult(false);
         setIsCorrect(null);
       } else endGame();
-    }, 1500);
+    }, 1200);
   };
 
   const endGame = () => {
     setGameEnded(true);
     const maxScore = questions.reduce((sum, q) => sum + q.points, 0);
-    const timeTaken = 300 - timeLeft;
-
-    saveGameResult(score, maxScore, timeTaken);
-    onGameComplete(score, maxScore, timeTaken, score);
+    saveGameResult(score);
+    onGameComplete(score, maxScore, 300 - timeLeft, score);
   };
 
-  const progress =
-    ((currentQuestionIndex + (showResult ? 1 : 0)) / questions.length) * 100;
+  const progress = ((currentQuestionIndex + (showResult ? 1 : 0)) / questions.length) * 100;
 
   // UI
-  if (!gameStarted) return (
-    <div className="text-center space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900">Trò chơi Máy tính Toán học</h2>
-        <p className="text-gray-600">Giải nhanh các bài toán bằng máy tính ảo!</p>
+  if (!gameStarted) {
+    return (
+      <div className="text-center space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-gray-900">Trò chơi Máy tính Toán học</h2>
+          <p className="text-gray-600">Giải nhanh các bài toán bằng máy tính ảo!</p>
+        </div>
+        <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
+          <Clock className="w-4 h-4" />
+          <span>Thời gian: 5 phút</span>
+          <Calculator className="w-4 h-4" />
+          <span>{questions.length} bài toán</span>
+        </div>
+        <Button
+          onClick={() => setGameStarted(true)}
+          size="lg"
+          className="bg-blue-500 hover:bg-blue-600"
+        >
+          Bắt đầu
+        </Button>
       </div>
-      <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
-        <Clock className="w-4 h-4" />
-        <span>Thời gian: 5 phút</span>
-        <Calculator className="w-4 h-4" />
-        <span>{questions.length} bài toán</span>
-      </div>
-      <Button onClick={() => setGameStarted(true)} size="lg" className="bg-blue-500 hover:bg-blue-600">
-        Bắt đầu
-      </Button>
-    </div>
-  );
+    );
+  }
 
   if (gameEnded) {
     const maxScore = questions.reduce((sum, q) => sum + q.points, 0);
-    const percentage = Math.round((score / maxScore) * 100);
-
     return (
       <div className="text-center space-y-6">
         <Trophy className="w-16 h-16 text-yellow-500 mx-auto" />
         <h2 className="text-2xl font-bold text-gray-900">Hoàn thành!</h2>
         <p className="text-gray-600">Bạn đã hoàn tất {questions.length} bài toán</p>
-        <div className="text-3xl font-bold text-blue-600">{score} điểm ({percentage}%)</div>
-
+        <div className="text-3xl font-bold text-blue-600">{score} điểm</div>
         <Button
           variant="outline"
           onClick={() => {
