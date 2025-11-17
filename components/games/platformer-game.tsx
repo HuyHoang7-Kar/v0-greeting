@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { destroyPlatformer, initPlatformer } from "@/scripts/game-platformer";
+import { initPlatformer } from "@/scripts/game-platformer"; // ❗ bỏ destroyPlatformer
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
@@ -12,26 +12,23 @@ interface Props {
 
 export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }: Props) {
   const canvasId = useRef(`platformer-${Math.random().toString(36).slice(2, 9)}`);
+  const destroyRef = useRef<() => void>(() => {});
+  const mountedRef = useRef(true);
+
   const [lastScore, setLastScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
-  const destroyRef = useRef<() => void>(() => {});
 
-  // ---------------------------
-  // 🧩 Lấy hoặc tạo game_id từ slug
-  // ---------------------------
   const getOrCreateGameId = async () => {
-    const { data: game, error: fetchErr } = await supabase
+    const { data: game } = await supabase
       .from("game")
       .select("id")
       .eq("slug", gameSlug)
       .single();
 
-    if (fetchErr && fetchErr.code !== "PGRST116") console.error(fetchErr);
-
     if (game) return game.id;
 
-    const { data: newGame, error: insertErr } = await supabase
+    const { data: newGame } = await supabase
       .from("game")
       .insert({
         slug: gameSlug,
@@ -41,17 +38,14 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       .select("id")
       .single();
 
-    if (insertErr) throw insertErr;
     return newGame.id;
   };
 
-  // ---------------------------
-  // 🧠 Lưu điểm vào game_plays + update game_scores + leaderboard
-  // ---------------------------
   const saveScore = async (score: number) => {
     try {
-      const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
+      if (!mountedRef.current) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return alert("Bạn cần đăng nhập để lưu điểm!");
 
       const { data: profile } = await supabase
@@ -65,14 +59,12 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
       const gameId = await getOrCreateGameId();
 
-      // 1) Ghi vào bảng game_plays
       await supabase.from("game_plays").insert({
         user_id: user.id,
         game_id: gameId,
         score
       });
 
-      // 2) Cập nhật bảng game_scores (best_score & plays_count)
       const { data: oldScore } = await supabase
         .from("game_scores")
         .select("*")
@@ -98,23 +90,18 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
           .eq("id", oldScore.id);
       }
 
-      // 3) Cập nhật leaderboard (points += score)
       await supabase.rpc("add_points", { user_uuid: user.id, plus: score });
 
-      alert(`🎯 Đã lưu điểm: ${score}`);
       setLastScore(score);
       onGameComplete?.(score);
-
     } catch (err) {
       console.error("Error saving score:", err);
-      alert("⚠️ Lỗi khi lưu điểm!");
     }
   };
 
-  // ---------------------------
-  // 🎮 Khởi tạo game
-  // ---------------------------
   useEffect(() => {
+    mountedRef.current = true;
+
     const marioImg = new Image();
     marioImg.src = "/sprites/mario.png";
     const blockImg = new Image();
@@ -126,6 +113,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       sprite: marioImg,
       block: blockImg,
       onScore: async (score: number) => {
+        if (!mountedRef.current) return;
         setLastScore(score);
         await saveScore(score);
       },
@@ -134,7 +122,11 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
     destroyRef.current = destroy;
     setLoading(false);
-    return () => destroy();
+
+    return () => {
+      mountedRef.current = false;
+      if (destroyRef.current) destroyRef.current(); // 🧹 cleanup duy nhất
+    };
   }, [gameSlug]);
 
   return (
@@ -144,7 +136,13 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       </div>
 
       <div className="flex items-center gap-3">
-        <Button onClick={() => destroyPlatformer()}>⏸️ Tạm dừng</Button>
+        <Button
+          onClick={() => {
+            if (destroyRef.current) destroyRef.current();
+          }}
+        >
+          ⏸️ Tạm dừng
+        </Button>
 
         <Button
           variant="ghost"
@@ -161,8 +159,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
         <p className="text-gray-400 text-sm">Đang tải trò chơi...</p>
       ) : (
         <p className="text-sm text-gray-400 text-center">
-          Dùng ← → để di chuyển, Space/↑ để nhảy.  
-          Chạm vào đáp án đúng để nhận điểm! 🚀
+          Dùng ← → để di chuyển, Space/↑ để nhảy. Chạm vào đáp án đúng để nhận điểm! 🚀
         </p>
       )}
     </div>
