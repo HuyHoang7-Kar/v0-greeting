@@ -17,7 +17,9 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
   const supabase = createClient();
   const destroyRef = useRef<() => void>(() => {});
 
+  // ---------------------------
   // 🧩 Lấy hoặc tạo game_id từ slug
+  // ---------------------------
   const getOrCreateGameId = async () => {
     const { data: game, error: fetchErr } = await supabase
       .from("game")
@@ -29,7 +31,6 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
     if (game) return game.id;
 
-    // Nếu chưa có thì tạo mới
     const { data: newGame, error: insertErr } = await supabase
       .from("game")
       .insert({
@@ -44,46 +45,75 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
     return newGame.id;
   };
 
-  // 🧠 Lưu điểm vào bảng `game_plays`
+  // ---------------------------
+  // 🧠 Lưu điểm vào game_plays + update game_scores + leaderboard
+  // ---------------------------
   const saveScore = async (score: number) => {
     try {
       const { data: { user }, error: authErr } = await supabase.auth.getUser();
       if (authErr) throw authErr;
-      if (!user) return alert("Bạn cần đăng nhập trước!");
+      if (!user) return alert("Bạn cần đăng nhập để lưu điểm!");
 
-      // Kiểm tra role trong bảng profiles
-      const { data: profile, error: profileErr } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
         .single();
 
-      if (profileErr) throw profileErr;
-      if (!profile || profile.role !== "student") {
+      if (!profile || profile.role !== "student")
         return alert("⚠️ Chỉ học sinh mới có thể lưu điểm!");
-      }
 
       const gameId = await getOrCreateGameId();
 
-      // ✅ Ghi vào bảng mới `game_plays`
-      const { error: insertError } = await supabase.from("game_plays").insert({
+      // 1) Ghi vào bảng game_plays
+      await supabase.from("game_plays").insert({
         user_id: user.id,
         game_id: gameId,
-        score,
+        score
       });
 
-      if (insertError) throw insertError;
+      // 2) Cập nhật bảng game_scores (best_score & plays_count)
+      const { data: oldScore } = await supabase
+        .from("game_scores")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("game_id", gameId)
+        .single();
 
-      alert(`🎯 Điểm ${score} đã được lưu!`);
+      if (!oldScore) {
+        await supabase.from("game_scores").insert({
+          user_id: user.id,
+          game_id: gameId,
+          best_score: score,
+          plays_count: 1,
+        });
+      } else {
+        await supabase
+          .from("game_scores")
+          .update({
+            best_score: Math.max(oldScore.best_score, score),
+            plays_count: oldScore.plays_count + 1,
+            updated_at: new Date(),
+          })
+          .eq("id", oldScore.id);
+      }
+
+      // 3) Cập nhật leaderboard (points += score)
+      await supabase.rpc("add_points", { user_uuid: user.id, plus: score });
+
+      alert(`🎯 Đã lưu điểm: ${score}`);
       setLastScore(score);
       onGameComplete?.(score);
+
     } catch (err) {
       console.error("Error saving score:", err);
       alert("⚠️ Lỗi khi lưu điểm!");
     }
   };
 
-  // 🎮 Khởi tạo game platformer
+  // ---------------------------
+  // 🎮 Khởi tạo game
+  // ---------------------------
   useEffect(() => {
     const marioImg = new Image();
     marioImg.src = "/sprites/mario.png";
@@ -104,17 +134,13 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
     destroyRef.current = destroy;
     setLoading(false);
-
     return () => destroy();
   }, [gameSlug]);
 
   return (
     <div className="flex flex-col items-center space-y-3">
       <div className="w-full max-w-3xl">
-        <canvas
-          id={canvasId.current}
-          className="w-full border rounded-lg bg-black"
-        />
+        <canvas id={canvasId.current} className="w-full border rounded-lg bg-black" />
       </div>
 
       <div className="flex items-center gap-3">
