@@ -7,6 +7,7 @@ interface UserProfile {
   id: string
   full_name: string
   role: string
+  email: string | null
   created_at: string
   updated_at: string
 }
@@ -20,8 +21,8 @@ export default function ActiveUser() {
     const fetchProfiles = async () => {
       try {
         const { data, error } = await supabase
-          .from<UserProfile>('profiles') // bảng public.profiles
-          .select('id, full_name, role, created_at, updated_at')
+          .from<UserProfile>('profiles')
+          .select('id, full_name, role, email, created_at, updated_at')
           .order('created_at', { ascending: false })
 
         if (error) {
@@ -47,22 +48,26 @@ export default function ActiveUser() {
   return (
     <div className="overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4">📜 Thông tin người dùng</h2>
+
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100">
-            <th className="border px-3 py-1">Họ và Tên</th>
-            <th className="border px-3 py-1">Role</th>
-            <th className="border px-3 py-1">Ngày tạo</th>
-            <th className="border px-3 py-1">Cập nhật lần cuối</th>
+            <th className="border px-3 py-2">Email</th>
+            <th className="border px-3 py-2">Họ và Tên</th>
+            <th className="border px-3 py-2">Role</th>
+            <th className="border px-3 py-2">Ngày tạo</th>
+            <th className="border px-3 py-2">Cập nhật lần cuối</th>
           </tr>
         </thead>
+
         <tbody>
           {users.map((user) => (
             <tr key={user.id}>
-              <td className="border px-3 py-1">{user.full_name}</td>
-              <td className="border px-3 py-1">{user.role}</td>
-              <td className="border px-3 py-1">{new Date(user.created_at).toLocaleString()}</td>
-              <td className="border px-3 py-1">{new Date(user.updated_at).toLocaleString()}</td>
+              <td className="border px-3 py-2">{user.email ?? '—'}</td>
+              <td className="border px-3 py-2">{user.full_name}</td>
+              <td className="border px-3 py-2">{user.role}</td>
+              <td className="border px-3 py-2">{new Date(user.created_at).toLocaleString()}</td>
+              <td className="border px-3 py-2">{new Date(user.updated_at).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>

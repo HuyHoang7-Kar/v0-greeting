@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, role, created_at, updated_at")
+      .select("id, full_name, role, email, created_at, updated_at")
       .order("created_at", { ascending: false });
 
     if (error) {
