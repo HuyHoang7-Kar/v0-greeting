@@ -16,9 +16,9 @@ interface GameQuestion {
 }
 
 interface WordMeaningMatchGameProps {
-  gameId: string
-  questions: GameQuestion[]
-  onGameComplete: (score: number, maxScore: number, timeTaken: number, pointsEarned: number) => void
+  gameId?: string
+  questions?: GameQuestion[]
+  onGameComplete?: (score: number, maxScore: number, timeTaken: number, pointsEarned: number) => void
 }
 
 interface MatchPair {
@@ -28,7 +28,19 @@ interface MatchPair {
   correct: boolean
 }
 
-export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: WordMeaningMatchGameProps) {
+// Default questions để tránh lỗi khi không truyền props
+const defaultQuestions: GameQuestion[] = [
+  { id: "1", question: "Apple", correct_answer: "Táo", options: ["Táo","Chuối","Cam","Nho"], points: 10 },
+  { id: "2", question: "Dog", correct_answer: "Chó", options: ["Chó","Mèo","Chuột","Cá"], points: 10 },
+  { id: "3", question: "Book", correct_answer: "Sách", options: ["Sách","Bút","Vở","Thước"], points: 10 },
+  { id: "4", question: "House", correct_answer: "Nhà", options: ["Nhà","Trường","Cửa","Bàn"], points: 10 },
+]
+
+export function WordMeaningMatchGame({
+  gameId = "default",
+  questions = defaultQuestions,
+  onGameComplete = () => {},
+}: WordMeaningMatchGameProps) {
   const [currentRound, setCurrentRound] = useState(0)
   const [score, setScore] = useState(0)
   const [gameStarted, setGameStarted] = useState(false)
@@ -42,11 +54,12 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
   const startTimeRef = useRef<number>(0)
 
   const questionsPerRound = 4
-  const totalRounds = Math.ceil(questions.length / questionsPerRound)
+  const totalRounds = questions.length > 0 ? Math.ceil(questions.length / questionsPerRound) : 1
   const maxScore = questions.reduce((sum, q) => sum + q.points, 0)
   const progress = ((currentRound + 1) / totalRounds) * 100
 
   const getCurrentRoundQuestions = () => {
+    if (!questions || questions.length === 0) return []
     const startIndex = currentRound * questionsPerRound
     return questions.slice(startIndex, startIndex + questionsPerRound)
   }
@@ -83,51 +96,38 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
   const endGame = () => {
     setGameEnded(true)
     const timeTaken = Math.floor((Date.now() - startTimeRef.current) / 1000)
-    const streakBonus = streak >= 8 ? 30 : 0 // Bonus for 8+ streak
+    const streakBonus = streak >= 8 ? 30 : 0
     const pointsEarned = score + streakBonus
     onGameComplete(score, maxScore, timeTaken, pointsEarned)
   }
 
   const handleEnglishSelect = (word: string) => {
     if (matchPairs.find((p) => p.english === word)?.matched) return
-
     setSelectedEnglish(word)
-
-    if (selectedVietnamese) {
-      checkMatch(word, selectedVietnamese)
-    }
+    if (selectedVietnamese) checkMatch(word, selectedVietnamese)
   }
 
   const handleVietnameseSelect = (meaning: string) => {
     if (matchPairs.find((p) => p.vietnamese === meaning)?.matched) return
-
     setSelectedVietnamese(meaning)
-
-    if (selectedEnglish) {
-      checkMatch(selectedEnglish, meaning)
-    }
+    if (selectedEnglish) checkMatch(selectedEnglish, meaning)
   }
 
   const checkMatch = (english: string, vietnamese: string) => {
     const pair = matchPairs.find((p) => p.english === english && p.vietnamese === vietnamese)
 
     if (pair) {
-      // Correct match
       const newPairs = matchPairs.map((p) =>
         p.english === english && p.vietnamese === vietnamese ? { ...p, matched: true, correct: true } : p,
       )
       setMatchPairs(newPairs)
 
-      const roundQuestions = getCurrentRoundQuestions()
-      const question = roundQuestions.find((q) => q.question === english)
-      if (question) {
-        setScore(score + question.points)
-        setStreak(streak + 1)
-      }
-
+      const question = getCurrentRoundQuestions().find((q) => q.question === english)
+      if (question) setScore(score + question.points)
+      setStreak(streak + 1)
       setFeedback("Chính xác! Ghép đúng rồi!")
 
-      // Play pronunciation
+      // Phát âm từ
       if ("speechSynthesis" in window) {
         const utterance = new SpeechSynthesisUtterance(english)
         utterance.lang = "en-US"
@@ -135,26 +135,17 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
         speechSynthesis.speak(utterance)
       }
 
-      // Check if round is complete
       if (newPairs.every((p) => p.matched)) {
         setRoundComplete(true)
         setTimeout(() => {
-          if (currentRound < totalRounds - 1) {
-            setCurrentRound(currentRound + 1)
-          } else {
-            endGame()
-          }
-        }, 2000)
+          if (currentRound < totalRounds - 1) setCurrentRound(currentRound + 1)
+          else endGame()
+        }, 1500)
       }
     } else {
-      // Incorrect match - shake animation
       setStreak(0)
       setFeedback("Sai rồi! Thử lại nhé.")
-
-      // Add shake effect
-      setTimeout(() => {
-        setFeedback(null)
-      }, 1500)
+      setTimeout(() => setFeedback(null), 1200)
     }
 
     setSelectedEnglish(null)
@@ -170,10 +161,7 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
     }
   }
 
-  const resetRound = () => {
-    initializeRound()
-    setFeedback(null)
-  }
+  const resetRound = () => initializeRound()
 
   if (!gameStarted) {
     return (
@@ -188,15 +176,6 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
           </p>
         </CardHeader>
         <CardContent className="text-center space-y-4">
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Luật chơi:</h3>
-            <ul className="text-sm text-gray-700 space-y-1">
-              <li>• Mỗi vòng có 4 cặp từ - nghĩa</li>
-              <li>• Nhấn từ tiếng Anh và nghĩa tiếng Việt để ghép</li>
-              <li>• Ghép đúng sẽ sáng lên và phát âm</li>
-              <li>• Ghép sai sẽ rung lắc</li>
-            </ul>
-          </div>
           <Button onClick={startGame} size="lg" className="bg-green-600 hover:bg-green-700">
             Bắt đầu ghép đôi!
           </Button>
@@ -222,28 +201,12 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
             </p>
             <p className="text-gray-600">Tỷ lệ chính xác: {percentage}%</p>
           </div>
-
-          <div className="flex justify-center space-x-8">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{streak}</div>
-              <div className="text-sm text-gray-600">Chuỗi đúng tối đa</div>
-            </div>
-          </div>
-
-          {streak >= 8 && (
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <p className="text-yellow-800 font-semibold">⚡ Tuyệt vời! Chuỗi ghép đúng ấn tượng!</p>
-            </div>
-          )}
-
-          <div className="bg-green-50 p-4 rounded-lg">
-            <p className="text-green-800">Bạn đã học từ vựng và ghi nhớ nghĩa rất nhanh!</p>
-          </div>
         </CardContent>
       </Card>
     )
   }
 
+  // Hiển thị game
   const englishWords = matchPairs.map((p) => p.english)
   const vietnameseMeanings = [...matchPairs.map((p) => p.vietnamese)].sort(() => Math.random() - 0.5)
 
@@ -277,7 +240,6 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
             </span>
           </div>
           <Progress value={progress} />
-
           {streak >= 3 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
               <p className="text-yellow-800 text-sm text-center flex items-center justify-center gap-1">
@@ -290,17 +252,8 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {roundComplete && (
-          <div className="bg-green-50 p-4 rounded-lg text-center">
-            <p className="text-green-800 font-semibold">🎉 Hoàn thành vòng {currentRound + 1}!</p>
-            {currentRound < totalRounds - 1 && (
-              <p className="text-green-700 text-sm mt-1">Chuẩn bị vòng tiếp theo...</p>
-            )}
-          </div>
-        )}
-
         <div className="grid md:grid-cols-2 gap-6">
-          {/* English Words Column */}
+          {/* English Column */}
           <div className="space-y-3">
             <h3 className="font-semibold text-gray-800 text-center">Từ tiếng Anh</h3>
             <div className="space-y-2">
@@ -316,9 +269,9 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
                       isMatched
                         ? "bg-green-100 border-green-300 text-green-800 shadow-lg"
                         : isSelected
-                          ? "bg-blue-100 border-blue-400 text-blue-800"
-                          : "bg-white border-gray-200 hover:border-green-300 hover:shadow-md"
-                    } ${feedback?.includes("Sai") && isSelected ? "animate-pulse" : ""}`}
+                        ? "bg-blue-100 border-blue-400 text-blue-800"
+                        : "bg-white border-gray-200 hover:border-green-300 hover:shadow-md"
+                    }`}
                     onClick={() => !isMatched && handleEnglishSelect(word)}
                   >
                     <div className="flex items-center justify-between">
@@ -341,7 +294,7 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
             </div>
           </div>
 
-          {/* Vietnamese Meanings Column */}
+          {/* Vietnamese Column */}
           <div className="space-y-3">
             <h3 className="font-semibold text-gray-800 text-center">Nghĩa tiếng Việt</h3>
             <div className="space-y-2">
@@ -357,9 +310,9 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
                       isMatched
                         ? "bg-green-100 border-green-300 text-green-800 shadow-lg"
                         : isSelected
-                          ? "bg-blue-100 border-blue-400 text-blue-800"
-                          : "bg-white border-gray-200 hover:border-green-300 hover:shadow-md"
-                    } ${feedback?.includes("Sai") && isSelected ? "animate-pulse" : ""}`}
+                        ? "bg-blue-100 border-blue-400 text-blue-800"
+                        : "bg-white border-gray-200 hover:border-green-300 hover:shadow-md"
+                    }`}
                     onClick={() => !isMatched && handleVietnameseSelect(meaning)}
                   >
                     <span className="text-lg">{meaning}</span>
@@ -379,24 +332,6 @@ export function WordMeaningMatchGame({ gameId, questions, onGameComplete }: Word
             {feedback}
           </div>
         )}
-
-        <div className="text-center text-sm text-gray-600">
-          {selectedEnglish && selectedVietnamese ? (
-            <p>
-              Đang kiểm tra: <strong>{selectedEnglish}</strong> ↔ <strong>{selectedVietnamese}</strong>
-            </p>
-          ) : selectedEnglish ? (
-            <p>
-              Đã chọn: <strong>{selectedEnglish}</strong> - Chọn nghĩa tiếng Việt
-            </p>
-          ) : selectedVietnamese ? (
-            <p>
-              Đã chọn: <strong>{selectedVietnamese}</strong> - Chọn từ tiếng Anh
-            </p>
-          ) : (
-            <p>Chọn một từ tiếng Anh và nghĩa tiếng Việt để ghép đôi</p>
-          )}
-        </div>
       </CardContent>
     </Card>
   )
