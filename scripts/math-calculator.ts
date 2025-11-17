@@ -23,20 +23,24 @@ interface Particle {
   maxLife: number
 }
 
-// Gradient background + particle confetti + floating math symbols
 export function initMathCalculatorScene({ canvasId, onError }: SceneOptions) {
+  // Chỉ chạy khi window/document tồn tại (client-side)
+  if (typeof window === "undefined" || typeof document === "undefined") return
+
   try {
     const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null
     if (!canvas) throw new Error(`Canvas #${canvasId} not found`)
     _canvas = canvas
+
     const ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("Failed to get 2D context")
     _ctx = ctx
 
     canvas.width = canvas.clientWidth
-    canvas.height = 200 // small banner height
+    canvas.height = 200 // banner height
 
     // create particles
+    _particles = []
     for (let i = 0; i < 50; i++) {
       _particles.push(createParticle(canvas))
     }
@@ -72,17 +76,17 @@ function loop(time?: number) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  // draw background gradient
+  // background gradient
   const grad = ctx.createLinearGradient(0, 0, 0, canvas.height)
   grad.addColorStop(0, "#1e3a8a")
   grad.addColorStop(1, "#3b82f6")
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // draw floating math symbols
+  // floating math symbols
   ctx.font = "24px monospace"
   const symbols = ["+", "-", "×", "÷", "=", "√", "π"]
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < symbols.length; i++) {
     const x = (Date.now() / 10 + i * 90) % canvas.width
     const y = 60 + Math.sin(Date.now() / 1000 + i) * 30
     ctx.fillStyle = "rgba(255,255,255,0.15)"
