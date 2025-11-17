@@ -3,18 +3,27 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Gamepad2, Brain, Calculator, Link, Rocket } from "lucide-react"
+import { Gamepad2, Brain, Calculator, Link } from "lucide-react"
 
 // Import các trò chơi
 import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
-import { PlatformerGame } from "./platformer-game"
 
-// Default questions cho Memory Match để tránh crash
+// --- Default props để tránh crash ---
 const defaultMemoryQuestions = [
   { id: "1", question: "2+2", correct_answer: "4", options: ["2","3","4","5"], points: 10 },
   { id: "2", question: "Capital of France?", correct_answer: "Paris", options: ["Paris","London","Rome","Berlin"], points: 10 },
+]
+
+const defaultWordPairs = [
+  { id: "1", word: "Cat", meaning: "Con mèo" },
+  { id: "2", word: "Dog", meaning: "Con chó" },
+]
+
+const defaultMathOperations = [
+  { id: "1", expression: "5+7", answer: 12 },
+  { id: "2", expression: "9-3", answer: 6 },
 ]
 
 export function GameHub() {
@@ -27,7 +36,11 @@ export function GameHub() {
       description: "Lật thẻ tìm cặp giống nhau.",
       icon: Brain,
       component: MemoryMatchGame,
-      props: { gameId: "memory-1", questions: defaultMemoryQuestions },
+      props: {
+        gameId: "memory-1",
+        questions: defaultMemoryQuestions,
+        onGameComplete: (score: number) => console.log("Memory Match score:", score)
+      },
     },
     {
       id: "word-meaning",
@@ -35,7 +48,11 @@ export function GameHub() {
       description: "Ghép từ với nghĩa đúng.",
       icon: Link,
       component: WordMeaningMatchGame,
-      props: {}, // thêm default props nếu cần
+      props: {
+        gameId: "word-meaning-1",
+        wordPairs: defaultWordPairs,
+        onGameComplete: (score: number) => console.log("Word Meaning score:", score)
+      },
     },
     {
       id: "math",
@@ -43,21 +60,16 @@ export function GameHub() {
       description: "Tính toán nhanh để ghi điểm.",
       icon: Calculator,
       component: MathCalculatorGame,
-      props: {}, // thêm default props nếu cần
-    },
-    {
-      id: "platformer",
-      name: "Platformer Game",
-      description: "Chạy nhảy và trả lời câu hỏi.",
-      icon: Rocket,
-      component: PlatformerGame,
-      props: {}, // thêm default props nếu cần
+      props: {
+        gameId: "math-1",
+        operations: defaultMathOperations,
+        onGameComplete: (score: number) => console.log("Math Calculator score:", score)
+      },
     },
   ]
 
   const selected = games.find((g) => g.id === selectedGame)
 
-  // Nếu đã chọn game
   if (selected && selected.component) {
     const GameComponent = selected.component
     return (
@@ -68,7 +80,6 @@ export function GameHub() {
     )
   }
 
-  // Hiển thị list game
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
