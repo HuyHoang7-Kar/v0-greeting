@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { createUser } from "./api/create-user"
-import { deleteUser } from "./api/delete-user"
 
 interface UserProfile {
   id: string
@@ -36,7 +34,14 @@ export default function UserManagement() {
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
     try {
-      await createUser(newEmail, newFullName, newRole)
+      const res = await fetch("/api/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail, full_name: newFullName, role: newRole }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
       setNewEmail("")
       setNewFullName("")
       setNewRole("student")
@@ -49,7 +54,14 @@ export default function UserManagement() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
-      await deleteUser(id)
+      const res = await fetch("/api/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
