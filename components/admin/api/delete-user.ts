@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Trả về JSON thành công
     return res.status(200).json({ success: true })
   } catch (err: any) {
+    // Trả JSON luôn kể cả khi lỗi
     return res.status(500).json({ error: err.message || 'Internal server error' })
   }
 }

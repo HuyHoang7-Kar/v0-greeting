@@ -58,8 +58,8 @@ export default function UserManagement() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
-      })
-      const data = await res.json()
+      });
+      const data = await res.json(); // giờ chắc chắn có JSON
       if (data.error) throw new Error(data.error)
 
       fetchUsers()
