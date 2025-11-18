@@ -69,36 +69,33 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     }
   }
 
-  // 2️⃣ Thêm câu hỏi
-  const handleAddQuestion = async () => {
+  // 2️⃣ Thêm câu hỏi vào state (chưa insert DB)
+  const handleAddQuestionToState = () => {
     if (!currentQuestion.question.trim()) return
-    if (!quizId) return
+    if (questions.length >= numQuestions) return
 
+    setQuestions([...questions, currentQuestion])
+    setCurrentQuestion({
+      question: "",
+      option_a: "",
+      option_b: "",
+      option_c: "",
+      option_d: "",
+      correct_answer: "A",
+      points: 1,
+    })
+  }
+
+  // 3️⃣ Lưu tất cả câu hỏi vào DB
+  const handleSaveAllQuestions = async () => {
+    if (!quizId) return
     setIsLoading(true)
     setError(null)
     try {
-      await supabase.from("quiz_questions").insert({
-        quiz_id: quizId,
-        ...currentQuestion,
-      })
-
-      const newQuestions = [...questions, currentQuestion]
-      setQuestions(newQuestions)
-
-      if (newQuestions.length < numQuestions) {
-        setCurrentQuestion({
-          question: "",
-          option_a: "",
-          option_b: "",
-          option_c: "",
-          option_d: "",
-          correct_answer: "A",
-          points: 1,
-        })
-      } else {
-        // Hoàn tất thêm câu hỏi
-        onSuccess?.()
-      }
+      await supabase.from("quiz_questions").insert(
+        questions.map(q => ({ quiz_id: quizId, ...q }))
+      )
+      onSuccess?.()
     } catch (err: any) {
       setError(err.message || JSON.stringify(err))
     } finally {
@@ -179,10 +176,22 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
             {["A","B","C","D"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button onClick={handleAddQuestion} disabled={isLoading} className="mt-2 bg-green-500 text-white flex items-center gap-2">
-          {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
-          Add Question
-        </Button>
+
+        {/* Nút thêm câu hỏi */}
+        {questions.length < numQuestions && (
+          <Button onClick={handleAddQuestionToState} disabled={isLoading} className="mt-2 bg-green-500 text-white flex items-center gap-2">
+            {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            Add Question
+          </Button>
+        )}
+
+        {/* Nút lưu tất cả khi đủ câu hỏi */}
+        {questions.length === numQuestions && (
+          <Button onClick={handleSaveAllQuestions} disabled={isLoading} className="mt-2 bg-blue-500 text-white flex items-center gap-2">
+            {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
+            Save All Questions
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

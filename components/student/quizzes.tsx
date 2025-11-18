@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
 import { Play, Clock, Trophy } from "lucide-react"
-import { Brain } from "lucide-react" // Import Brain component
+import { Brain } from "lucide-react"
 
 interface Quiz {
   id: string
@@ -29,6 +29,7 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
   const [answers, setAnswers] = useState<{ [key: string]: string }>({})
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
+  const [totalScore, setTotalScore] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   const startQuiz = async (quizId: string) => {
@@ -70,7 +71,6 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
         setCurrentQuestion(currentQuestion + 1)
         setSelectedAnswer(null)
       } else {
-        // Quiz complete, calculate score
         finishQuiz(newAnswers)
       }
     }
@@ -87,12 +87,9 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
     setScore(correctCount)
     setShowResults(true)
 
-    // Save result to database
     try {
       const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
 
       if (user && activeQuiz) {
         await supabase.from("results").insert({
@@ -101,6 +98,16 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
           score: correctCount,
           total_questions: quizQuestions.length,
         })
+
+        // Lấy tổng điểm tất cả quiz của học sinh
+        const { data: totalResults } = await supabase
+          .from("results")
+          .select("score")
+          .eq("user_id", user.id)
+
+        const totalScoreSum = totalResults?.reduce((sum, r: any) => sum + (r.score || 0), 0) || 0
+        setTotalScore(totalScoreSum)
+
         onQuizComplete()
       }
     } catch (error) {
@@ -116,6 +123,7 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
     setAnswers({})
     setShowResults(false)
     setScore(0)
+    setTotalScore(null)
   }
 
   if (activeQuiz && !showResults) {
@@ -182,10 +190,17 @@ export function StudentQuizzes({ quizzes, onQuizComplete }: StudentQuizzesProps)
               <Trophy className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Quiz Complete!</h2>
-            <p className="text-lg text-gray-700 mb-6">
+            <p className="text-lg text-gray-700 mb-2">
               You scored <span className="font-bold text-green-600">{score}</span> out of{" "}
               <span className="font-bold">{quizQuestions.length}</span> ({percentage}%)
             </p>
+
+            {totalScore !== null && (
+              <p className="text-lg text-gray-700 mb-4">
+                <span className="font-bold text-blue-600">Total Score Across All Quizzes:</span> {totalScore}
+              </p>
+            )}
+
             <div className="mb-6">
               <Progress value={percentage} className="h-3" />
             </div>
