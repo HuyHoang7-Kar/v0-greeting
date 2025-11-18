@@ -69,7 +69,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     }
   }
 
-  // 2️⃣ Thêm câu hỏi vào state (chưa insert DB)
+  // 2️⃣ Thêm câu hỏi vào state
   const handleAddQuestionToState = () => {
     if (!currentQuestion.question.trim()) return
     if (questions.length >= numQuestions) return
@@ -103,6 +103,9 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     }
   }
 
+  // -------------------
+  // Render
+  // -------------------
   if (step === "createQuiz") {
     return (
       <Card className="p-4 border-2 border-blue-200">
@@ -128,7 +131,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
             onChange={(e) => setNumQuestions(Number(e.target.value))}
             placeholder="Number of questions"
           />
-          <Button onClick={handleCreateQuiz} disabled={isLoading} className="mt-2 bg-blue-500 text-white">
+          <Button onClick={handleCreateQuiz} disabled={isLoading} className="mt-2 bg-blue-500 text-white flex items-center gap-2">
             {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
             Create Quiz
           </Button>
@@ -137,57 +140,72 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     )
   }
 
-  // Step: Add questions
+  // Add Questions Step
   return (
     <Card className="p-4 border-2 border-green-200">
       <CardHeader>
-        <CardTitle>Add Question {questions.length + 1} / {numQuestions}</CardTitle>
+        <CardTitle>
+          {questions.length < numQuestions
+            ? `Add Question ${questions.length + 1} / ${numQuestions}`
+            : "All Questions Added"}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {error && <p className="text-red-600">{error}</p>}
-        <Textarea
-          placeholder="Question"
-          value={currentQuestion.question}
-          onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })}
-        />
-        {["a","b","c","d"].map(opt => (
-          <Input
-            key={opt}
-            placeholder={`Option ${opt.toUpperCase()}`}
-            value={currentQuestion[`option_${opt}` as keyof QuizQuestion] as string}
-            onChange={(e) => setCurrentQuestion({ ...currentQuestion, [`option_${opt}`]: e.target.value })}
-          />
-        ))}
-        <Input
-          type="number"
-          min={1}
-          placeholder="Points"
-          value={currentQuestion.points}
-          onChange={(e) => setCurrentQuestion({ ...currentQuestion, points: Number(e.target.value) })}
-        />
-        <Select
-          value={currentQuestion.correct_answer}
-          onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v as "A"|"B"|"C"|"D" })}
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Correct Answer" />
-          </SelectTrigger>
-          <SelectContent>
-            {["A","B","C","D"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
 
-        {/* Nút thêm câu hỏi */}
+        {/* Hiển thị form nhập chỉ khi chưa đủ số câu hỏi */}
         {questions.length < numQuestions && (
-          <Button onClick={handleAddQuestionToState} disabled={isLoading} className="mt-2 bg-green-500 text-white flex items-center gap-2">
-            {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            Add Question
-          </Button>
+          <>
+            <Textarea
+              placeholder="Question"
+              value={currentQuestion.question}
+              onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })}
+            />
+            {["a","b","c","d"].map(opt => (
+              <Input
+                key={opt}
+                placeholder={`Option ${opt.toUpperCase()}`}
+                value={currentQuestion[`option_${opt}` as keyof QuizQuestion] as string}
+                onChange={(e) => setCurrentQuestion({ ...currentQuestion, [`option_${opt}`]: e.target.value })}
+              />
+            ))}
+            <Input
+              type="number"
+              min={1}
+              placeholder="Points"
+              value={currentQuestion.points}
+              onChange={(e) => setCurrentQuestion({ ...currentQuestion, points: Number(e.target.value) })}
+            />
+            <Select
+              value={currentQuestion.correct_answer}
+              onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v as "A"|"B"|"C"|"D" })}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Correct Answer" />
+              </SelectTrigger>
+              <SelectContent>
+                {["A","B","C","D"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Button
+              onClick={handleAddQuestionToState}
+              disabled={isLoading}
+              className="mt-2 bg-green-500 text-white flex items-center gap-2"
+            >
+              {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              Add Question
+            </Button>
+          </>
         )}
 
-        {/* Nút lưu tất cả khi đủ câu hỏi */}
+        {/* Hiển thị nút lưu khi đủ số câu hỏi */}
         {questions.length === numQuestions && (
-          <Button onClick={handleSaveAllQuestions} disabled={isLoading} className="mt-2 bg-blue-500 text-white flex items-center gap-2">
+          <Button
+            onClick={handleSaveAllQuestions}
+            disabled={isLoading}
+            className="mt-2 bg-blue-500 text-white flex items-center gap-2"
+          >
             {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
             Save All Questions
           </Button>
