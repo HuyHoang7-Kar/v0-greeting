@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,7 +22,7 @@ interface TeacherQuizzesProps {
   onQuizzesChange: () => void
 }
 
-export default function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps) {
+export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps) {
   const supabase = createClient()
   const [selectedQuiz, setSelectedQuiz] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
