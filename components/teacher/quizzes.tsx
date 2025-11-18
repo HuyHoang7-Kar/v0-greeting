@@ -82,7 +82,6 @@ export default function TeacherQuizzes() {
     fetchQuizzes()
   }
 
-  // Nếu đang chọn quiz để thêm câu hỏi
   if (selectedQuiz) {
     return (
       <div className="space-y-6">
