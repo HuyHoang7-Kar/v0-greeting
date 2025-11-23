@@ -23,16 +23,18 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
   // Lấy hoặc tạo game
   // ==========================================================
   const getOrCreateGameId = async () => {
-    let { data: game } = await supabase
-      .from("game")
+    const { data: game, error } = await supabase
+      .from("games") // 🔥 FIX tên bảng
       .select("id")
       .eq("slug", gameSlug)
-      .single();
+      .maybeSingle();
+
+    if (error) console.error("❌ Lỗi lấy game:", error);
 
     if (game) return game.id;
 
-    const { data: newGame } = await supabase
-      .from("game")
+    const { data: newGame, error: insertErr } = await supabase
+      .from("games")
       .insert({
         slug: gameSlug,
         title: "Mario Platformer",
@@ -41,94 +43,107 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       .select("id")
       .single();
 
+    if (insertErr) {
+      console.error("❌ Lỗi tạo game:", insertErr);
+      return null;
+    }
+
     return newGame.id;
   };
 
   // ==========================================================
-  // Hàm lưu điểm đầy đủ theo cấu trúc database mới
+  // Hàm LƯU ĐIỂM (chỉ gọi khi ấn nút)
   // ==========================================================
   const saveScore = async (score: number) => {
     try {
-      if (!mountedRef.current) return;
+      console.log("🔵 Bắt đầu lưu điểm:", score);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return alert("Bạn cần đăng nhập để lưu điểm!");
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile || profile.role !== "student")
-        return alert("⚠️ Chỉ học sinh mới có thể lưu điểm!");
+      if (!user) return alert("Bạn cần đăng nhập!");
 
       const gameId = await getOrCreateGameId();
+      if (!gameId) return alert("Không lấy được gameId!");
 
-      // 1️⃣ LƯU LỊCH SỬ CHƠI (game_plays)
-      await supabase.from("game_plays").insert({
-        user_id: user.id,
-        game_id: gameId,
-        score,
-        duration: null,   // hoặc thời gian chơi thực nếu game trả về
-        combo: 0,
-        metadata: {}
-      });
+      // 1️⃣ Ghi vào bảng game_plays
+      const { error: playErr } = await supabase
+        .from("game_plays")
+        .insert({
+          user_id: user.id,
+          game_id: gameId,
+          score,
+          duration: null,
+          combo: 0,
+          metadata: {}
+        });
 
-      // 2️⃣ LƯU HOẶC CẬP NHẬT game_scores
-      const { data: oldScore } = await supabase
+      if (playErr) {
+        console.error("❌ Lỗi lưu game_plays:", playErr);
+        return alert("Không thể lưu lịch sử chơi!");
+      }
+
+      // 2️⃣ Lấy record của game_scores
+      const { data: oldScore, error: oldErr } = await supabase
         .from("game_scores")
         .select("*")
         .eq("user_id", user.id)
         .eq("game_id", gameId)
         .maybeSingle();
 
+      if (oldErr) console.error("⚠️ Lỗi khi lấy game_scores:", oldErr);
+
       if (!oldScore) {
-        // ➕ Tạo record lần đầu
-        await supabase.from("game_scores").insert({
-          user_id: user.id,
-          game_id: gameId,
-          best_score: score,
-          last_score: score,
-          plays_count: 1,
-          last_played: new Date(),
-          max_combo: 0,
-          average_score: score
-        });
+        // ➕ Tạo record mới
+        const { error: createErr } = await supabase
+          .from("game_scores")
+          .insert({
+            user_id: user.id,
+            game_id: gameId,
+            best_score: score,
+            last_score: score,
+            plays_count: 1,
+            last_played: new Date(),
+            max_combo: 0,
+            average_score: score
+          });
+
+        if (createErr) {
+          console.error("❌ Lỗi tạo game_scores:", createErr);
+          return alert("Không thể tạo bảng điểm!");
+        }
       } else {
-        // 🔄 Update bản ghi cũ
+        // 🔄 Update record
         const newCount = oldScore.plays_count + 1;
         const newAverage = (oldScore.average_score * oldScore.plays_count + score) / newCount;
 
-        await supabase
+        const { error: updateErr } = await supabase
           .from("game_scores")
           .update({
             best_score: Math.max(oldScore.best_score, score),
             last_score: score,
             plays_count: newCount,
-            last_played: new Date(),
             average_score: newAverage,
+            last_played: new Date(),
             updated_at: new Date()
           })
           .eq("id", oldScore.id);
+
+        if (updateErr) {
+          console.error("❌ Lỗi cập nhật game_scores:", updateErr);
+          return alert("Không thể cập nhật điểm!");
+        }
       }
 
-      // 3️⃣ Cộng điểm leaderboard
-      await supabase.rpc("add_points", {
-        user_uuid: user.id,
-        plus: score
-      });
-
-      setLastScore(score);
-      onGameComplete?.(score);
+      console.log("✅ Lưu điểm thành công!");
+      alert("🎉 Đã lưu điểm!");
 
     } catch (err) {
-      console.error("Error saving score:", err);
+      console.error("🔥 Lỗi saveScore:", err);
+      alert("Có lỗi xảy ra khi lưu điểm!");
     }
   };
 
   // ==========================================================
-  // INIT GAME
+  // INIT GAME — KHÔNG TỰ LƯU ĐIỂM NỮA
   // ==========================================================
   useEffect(() => {
     mountedRef.current = true;
@@ -143,10 +158,8 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       height: 360,
       sprite: marioImg,
       block: blockImg,
-      onScore: async (score: number) => {
-        if (!mountedRef.current) return;
-        setLastScore(score);
-        await saveScore(score);
+      onScore: (score: number) => {
+        setLastScore(score); // 🔥 chỉ update UI, không lưu
       },
       onError: (err) => console.error(err)
     });
@@ -160,6 +173,9 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
     };
   }, [gameSlug]);
 
+  // ==========================================================
+  // RENDER
+  // ==========================================================
   return (
     <div className="flex flex-col items-center space-y-3">
       <div className="w-full max-w-3xl">
@@ -174,7 +190,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
         <Button
           variant="ghost"
           onClick={() => {
-            if (lastScore === 0) return alert("Chưa có điểm để lưu");
+            if (lastScore === 0) return alert("Chưa có điểm!");
             saveScore(lastScore);
           }}
         >
@@ -182,9 +198,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
         </Button>
       </div>
 
-      {loading ? (
-        <p className="text-gray-400 text-sm">Đang tải trò chơi...</p>
-      ) : (
+      {!loading && (
         <p className="text-sm text-gray-400 text-center">
           Dùng ← → để di chuyển, Space/↑ để nhảy. Chạm vào đáp án đúng để nhận điểm! 🚀
         </p>
