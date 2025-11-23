@@ -8,15 +8,19 @@ interface Props {
   onGameComplete?: (score: number) => void;
 }
 
+interface Pipe {
+  x: number;
+  top: number;
+  bottom: number;
+  passed?: boolean;
+}
+
 export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const supabase = createClient();
   const [score, setScore] = useState(0);
 
-  // ==========================================================
-  // Lấy hoặc tạo game
-  // ==========================================================
   const getOrCreateGameId = async (): Promise<string | null> => {
     const { data: game, error } = await supabase
       .from("game")
@@ -41,9 +45,6 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
     return newGame.id;
   };
 
-  // ==========================================================
-  // Lưu điểm khi game kết thúc
-  // ==========================================================
   const saveScore = async (finalScore: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -52,7 +53,6 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       const gameId = await getOrCreateGameId();
       if (!gameId) return;
 
-      // Lưu lịch sử chơi
       await supabase.from("game_plays").insert({
         user_id: user.id,
         game_id: gameId,
@@ -60,7 +60,6 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
         played_at: new Date()
       });
 
-      // Cập nhật bảng điểm
       const { data: oldScore } = await supabase
         .from("game_scores")
         .select("*")
@@ -100,9 +99,6 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
     }
   };
 
-  // ==========================================================
-  // Game logic
-  // ==========================================================
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -121,7 +117,7 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
     const pipeWidth = 50;
     const pipeGap = 150;
     const pipeSpeed = 2;
-    let pipes: { x: number; top: number; bottom: number }[] = [];
+    let pipes: Pipe[] = [];
     let gameOver = false;
     let currentScore = 0;
 
@@ -129,9 +125,10 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       birdV = jump;
     };
 
-    window.addEventListener("keydown", (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") flap();
-    });
+    };
+    window.addEventListener("keydown", handleKeyDown);
 
     const spawnPipe = () => {
       const top = Math.random() * (HEIGHT - pipeGap - 100) + 50;
@@ -141,22 +138,22 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
     const draw = () => {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-      // Nền
+      // Background
       ctx.fillStyle = "#87CEEB";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // Chim
+      // Bird
       ctx.fillStyle = "yellow";
       ctx.fillRect(80, birdY, 30, 30);
 
-      // Ống
+      // Pipes
       ctx.fillStyle = "green";
-      pipes.forEach((pipe) => {
+      pipes.forEach(pipe => {
         ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
         ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, HEIGHT - pipe.bottom);
       });
 
-      // Điểm
+      // Score
       ctx.fillStyle = "black";
       ctx.font = "24px sans-serif";
       ctx.fillText("Score: " + currentScore, 10, 30);
@@ -168,18 +165,11 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       birdV += gravity;
       birdY += birdV;
 
-      // Cập nhật ống
-      pipes.forEach((pipe) => {
-        pipe.x -= pipeSpeed;
-      });
+      pipes.forEach(pipe => (pipe.x -= pipeSpeed));
 
-      // Tạo ống mới
       if (pipes.length === 0 || pipes[pipes.length - 1].x < WIDTH - 200) spawnPipe();
-
-      // Xóa ống đi qua
       if (pipes.length && pipes[0].x + pipeWidth < 0) pipes.shift();
 
-      // Kiểm tra va chạm
       for (const pipe of pipes) {
         if (
           80 + 30 > pipe.x &&
@@ -192,10 +182,9 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
 
       if (birdY + 30 > HEIGHT || birdY < 0) gameOver = true;
 
-      // Cập nhật điểm
-      pipes.forEach((pipe) => {
-        if (!pipe["passed"] && pipe.x + pipeWidth < 80) {
-          pipe["passed"] = true;
+      pipes.forEach(pipe => {
+        if (!pipe.passed && pipe.x + pipeWidth < 80) {
+          pipe.passed = true;
           currentScore += 10;
           setScore(currentScore);
         }
@@ -206,14 +195,15 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       update();
       draw();
       if (!gameOver) animationRef.current = requestAnimationFrame(loop);
-      else {
-        saveScore(currentScore);
-      }
+      else saveScore(currentScore);
     };
 
     loop();
 
-    return () => cancelAnimationFrame(animationRef.current);
+    return () => {
+      cancelAnimationFrame(animationRef.current);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   return <canvas ref={canvasRef} style={{ border: "2px solid black", display: "block", margin: "0 auto" }} />;
