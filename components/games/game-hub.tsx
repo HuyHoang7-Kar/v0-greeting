@@ -10,7 +10,8 @@ import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
-import { FlappyBirdGame } from "./FlappyGameAutoSave" // <-- Thêm đây
+import { FlappyBirdGame } from "./FlappyGameAutoSave" 
+import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave" // <-- Thêm trò Car Dodge
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -79,7 +80,14 @@ export function GameHub() {
       name: "Flappy Game AutoSave",
       description: "Flappy Bird tự động lưu điểm khi chết.",
       icon: Rocket,
-      component: FlappyBirdGame, // <-- Thêm FlappyGameAutoSave
+      component: FlappyBirdGame,
+    },
+    {
+      id: "car-dodge",
+      name: "Car Dodge AutoSave",
+      description: "Xe né chướng ngại vật, tự động lưu điểm.",
+      icon: Rocket,
+      component: CarDodgeGameAutoSave, // <-- Thêm Car Dodge
     },
   ]
 
