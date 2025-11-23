@@ -71,9 +71,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
           user_id: user.id,
           game_id: gameId,
           score,
-          duration: null,
-          combo: 0,
-          metadata: {}
+          played_at: new Date() 
         });
 
       if (playErr) {
