@@ -24,7 +24,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
   // ==========================================================
   const getOrCreateGameId = async () => {
     const { data: game, error } = await supabase
-      .from("games") // 🔥 FIX tên bảng
+      .from("game") // 🔥 FIX tên bảng
       .select("id")
       .eq("slug", gameSlug)
       .maybeSingle();
@@ -34,7 +34,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
     if (game) return game.id;
 
     const { data: newGame, error: insertErr } = await supabase
-      .from("games")
+      .from("game")
       .insert({
         slug: gameSlug,
         title: "Mario Platformer",
