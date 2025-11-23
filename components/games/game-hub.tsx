@@ -10,7 +10,7 @@ import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
-import { FlappyGameAutoSave } from "./FlappyGameAutoSave" // <-- import Flappy
+import { FlappyGameAuto } from "./FlappyGameAutoSave" // <-- import Flappy
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
