@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initPlatformer } from "@/scripts/game-platformer"; // ❗ bỏ destroyPlatformer
+import { initPlatformer } from "@/scripts/game-platformer";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
@@ -19,8 +19,11 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  // ==========================================================
+  // Lấy hoặc tạo game
+  // ==========================================================
   const getOrCreateGameId = async () => {
-    const { data: game } = await supabase
+    let { data: game } = await supabase
       .from("game")
       .select("id")
       .eq("slug", gameSlug)
@@ -33,7 +36,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       .insert({
         slug: gameSlug,
         title: "Mario Platformer",
-        description: "Trò chơi học toán kiểu Mario",
+        description: "Trò chơi học toán kiểu Mario"
       })
       .select("id")
       .single();
@@ -41,6 +44,9 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
     return newGame.id;
   };
 
+  // ==========================================================
+  // Hàm lưu điểm đầy đủ theo cấu trúc database mới
+  // ==========================================================
   const saveScore = async (score: number) => {
     try {
       if (!mountedRef.current) return;
@@ -59,46 +65,71 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
       const gameId = await getOrCreateGameId();
 
+      // 1️⃣ LƯU LỊCH SỬ CHƠI (game_plays)
       await supabase.from("game_plays").insert({
         user_id: user.id,
         game_id: gameId,
-        score
+        score,
+        duration: null,   // hoặc thời gian chơi thực nếu game trả về
+        combo: 0,
+        metadata: {}
       });
 
+      // 2️⃣ LƯU HOẶC CẬP NHẬT game_scores
       const { data: oldScore } = await supabase
         .from("game_scores")
         .select("*")
         .eq("user_id", user.id)
         .eq("game_id", gameId)
-        .single();
+        .maybeSingle();
 
       if (!oldScore) {
+        // ➕ Tạo record lần đầu
         await supabase.from("game_scores").insert({
           user_id: user.id,
           game_id: gameId,
           best_score: score,
+          last_score: score,
           plays_count: 1,
+          last_played: new Date(),
+          max_combo: 0,
+          average_score: score
         });
       } else {
+        // 🔄 Update bản ghi cũ
+        const newCount = oldScore.plays_count + 1;
+        const newAverage = (oldScore.average_score * oldScore.plays_count + score) / newCount;
+
         await supabase
           .from("game_scores")
           .update({
             best_score: Math.max(oldScore.best_score, score),
-            plays_count: oldScore.plays_count + 1,
-            updated_at: new Date(),
+            last_score: score,
+            plays_count: newCount,
+            last_played: new Date(),
+            average_score: newAverage,
+            updated_at: new Date()
           })
           .eq("id", oldScore.id);
       }
 
-      await supabase.rpc("add_points", { user_uuid: user.id, plus: score });
+      // 3️⃣ Cộng điểm leaderboard
+      await supabase.rpc("add_points", {
+        user_uuid: user.id,
+        plus: score
+      });
 
       setLastScore(score);
       onGameComplete?.(score);
+
     } catch (err) {
       console.error("Error saving score:", err);
     }
   };
 
+  // ==========================================================
+  // INIT GAME
+  // ==========================================================
   useEffect(() => {
     mountedRef.current = true;
 
@@ -117,7 +148,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
         setLastScore(score);
         await saveScore(score);
       },
-      onError: (err) => console.error(err),
+      onError: (err) => console.error(err)
     });
 
     destroyRef.current = destroy;
@@ -125,7 +156,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
 
     return () => {
       mountedRef.current = false;
-      if (destroyRef.current) destroyRef.current(); // 🧹 cleanup duy nhất
+      destroyRef.current?.();
     };
   }, [gameSlug]);
 
@@ -136,11 +167,7 @@ export function PlatformerGame({ gameSlug = "platformer-mario", onGameComplete }
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          onClick={() => {
-            if (destroyRef.current) destroyRef.current();
-          }}
-        >
+        <Button onClick={() => destroyRef.current?.()}>
           ⏸️ Tạm dừng
         </Button>
 
