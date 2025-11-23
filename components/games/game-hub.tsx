@@ -10,6 +10,7 @@ import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
+import { FlappyGameAutoSave } from "./FlappyGameAutoSave" // <-- import Flappy
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -72,7 +73,13 @@ export function GameHub() {
       description: "Chạy nhảy và trả lời câu hỏi.",
       icon: Rocket,
       component: PlatformerGame,
-      // KHÔNG set default props → sẽ dùng props thực tế khi render
+    },
+    {
+      id: "flappy",
+      name: "Flappy Mini",
+      description: "Điểu khiển chim né cột. Tự lưu điểm khi chết.",
+      icon: Rocket,
+      component: FlappyGameAutoSave,
     },
   ]
 
