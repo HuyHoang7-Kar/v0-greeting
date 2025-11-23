@@ -120,9 +120,11 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
     let pipes: Pipe[] = [];
     let gameOver = false;
     let currentScore = 0;
+    let started = false; // game chưa bắt đầu
 
     const flap = () => {
       birdV = jump;
+      if (!started) started = true; // nhấn Space lần đầu → bắt đầu game
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -157,10 +159,17 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       ctx.fillStyle = "black";
       ctx.font = "24px sans-serif";
       ctx.fillText("Score: " + currentScore, 10, 30);
+
+      // Text hướng dẫn
+      if (!started) {
+        ctx.fillStyle = "red";
+        ctx.font = "20px sans-serif";
+        ctx.fillText("Press SPACE to start", WIDTH/2 - 100, HEIGHT/2);
+      }
     };
 
     const update = () => {
-      if (gameOver) return;
+      if (!started || gameOver) return;
 
       birdV += gravity;
       birdY += birdV;
@@ -195,7 +204,7 @@ export function FlappyBirdGame({ gameSlug = "flappy-bird", onGameComplete }: Pro
       update();
       draw();
       if (!gameOver) animationRef.current = requestAnimationFrame(loop);
-      else saveScore(currentScore);
+      else if (started) saveScore(currentScore);
     };
 
     loop();
