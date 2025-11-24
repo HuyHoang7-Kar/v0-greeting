@@ -23,25 +23,72 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
   const supabase = createClient();
   const [score, setScore] = useState(0);
 
-  // Lấy hoặc tạo game
+  // -------------------------
+  // TOÁN HỌC
+  // -------------------------
+  const [question, setQuestion] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<string>("");
+  const [correctAnswer, setCorrectAnswer] = useState<number | null>(null);
+  const [showQuestion, setShowQuestion] = useState(false);
+
+  const spawnMathQuestion = () => {
+    const a = Math.floor(1 + Math.random() * 9);
+    const b = Math.floor(1 + Math.random() * 9);
+    const ops = ["+", "-", "*"];
+    const op = ops[Math.floor(Math.random() * ops.length)];
+
+    let result = 0;
+    if (op === "+") result = a + b;
+    if (op === "-") result = a - b;
+    if (op === "*") result = a * b;
+
+    setQuestion(`${a} ${op} ${b} = ?`);
+    setCorrectAnswer(result);
+    setAnswer("");
+    setShowQuestion(true);
+  };
+
+  const handleAnswer = () => {
+    if (Number(answer) === correctAnswer) {
+      // đúng
+      obstacleSpeedRef.current *= 1.4;
+      setScore((s) => s + 20);
+    } else {
+      // sai
+      obstacleSpeedRef.current *= 0.7;
+      setTimeout(() => {
+        obstacleSpeedRef.current *= 1.3;
+      }, 5000);
+    }
+    setShowQuestion(false);
+  };
+
+  // -------------------------
+  // SUPABASE GAME SAVE
+  // -------------------------
+
   const getOrCreateGameId = async (): Promise<string | null> => {
-    const { data: game, error } = await supabase
+    const { data: game } = await supabase
       .from("game")
       .select("id")
       .eq("slug", gameSlug)
       .maybeSingle();
-    if (error) return null;
+
     if (game) return game.id;
-    const { data: newGame, error: insertErr } = await supabase
+
+    const { data: newGame } = await supabase
       .from("game")
-      .insert({ slug: gameSlug, title: "Car Dodge Game", description: "Xe vượt chướng ngại vật" })
+      .insert({
+        slug: gameSlug,
+        title: "Car Dodge Game",
+        description: "Xe vượt chướng ngại vật + toán học"
+      })
       .select("id")
       .single();
-    if (insertErr) return null;
-    return newGame.id;
+
+    return newGame?.id ?? null;
   };
 
-  // Lưu điểm
   const saveScore = async (finalScore: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -70,12 +117,13 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
           best_score: finalScore,
           last_score: finalScore,
           plays_count: 1,
-          last_played: new Date(),
-          average_score: finalScore
+          average_score: finalScore,
+          last_played: new Date()
         });
       } else {
         const newCount = oldScore.plays_count + 1;
         const newAverage = (oldScore.average_score * oldScore.plays_count + finalScore) / newCount;
+
         await supabase
           .from("game_scores")
           .update({
@@ -95,40 +143,47 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
     }
   };
 
+  // -------------------------
+  // GAME LOGIC
+  // -------------------------
+
+  const obstacleSpeedRef = useRef(4);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = canvas.getContext("2d")!;
     const WIDTH = 400;
     const HEIGHT = 600;
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
-    const carWidth = 50;
-    const carHeight = 100;
+    const carWidth = 55;
+    const carHeight = 110;
     let carX = WIDTH / 2 - carWidth / 2;
     const carY = HEIGHT - carHeight - 20;
     const carSpeed = 20;
 
     let obstacles: Obstacle[] = [];
-    const obstacleSpeed = 4;
     let gameOver = false;
     let started = false;
     let currentScore = 0;
-    let laneOffset = 0; // Vẽ vạch đường
+    let laneOffset = 0;
+
+    let nextQuestionTime = performance.now() + 5000 + Math.random() * 4000;
 
     const moveLeft = () => {
-      carX = Math.max(0, carX - carSpeed);
-      if (!started) started = true;
+      carX = Math.max(20, carX - carSpeed);
+      started = true;
     };
     const moveRight = () => {
-      carX = Math.min(WIDTH - carWidth, carX + carSpeed);
-      if (!started) started = true;
+      carX = Math.min(WIDTH - carWidth - 20, carX + carSpeed);
+      started = true;
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (showQuestion) return;
+
       if (e.code === "ArrowLeft") moveLeft();
       if (e.code === "ArrowRight") moveRight();
       if (e.code === "Space") started = true;
@@ -137,14 +192,24 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
 
     const spawnObstacle = () => {
       const width = 30 + Math.random() * 50;
-      const x = Math.random() * (WIDTH - width);
-      const color = ["red","blue","orange","purple"][Math.floor(Math.random()*4)];
-      obstacles.push({ x, y: -50, width, height: 50, color });
+      const x = Math.random() * (WIDTH - width - 40) + 20;
+      const color = ["#ff4b4b", "#3399ff", "#ffaa00", "#8e44ad"][Math.floor(Math.random() * 4)];
+      obstacles.push({ x, y: -50, width, height: 60, color });
     };
 
+    // -------------------------
+    // GRAPHICS
+    // -------------------------
+
     const drawRoad = () => {
-      ctx.fillStyle = "#444";
+      // Dark gradient road
+      const grd = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+      grd.addColorStop(0, "#2e2e2e");
+      grd.addColorStop(1, "#1b1b1b");
+      ctx.fillStyle = grd;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Lane lines
       ctx.strokeStyle = "white";
       ctx.lineWidth = 4;
 
@@ -153,57 +218,95 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
 
       for (let y = -40 + laneOffset; y < HEIGHT; y += 40) {
         ctx.beginPath();
-        ctx.moveTo(WIDTH/2, y);
-        ctx.lineTo(WIDTH/2, y+20);
+        ctx.moveTo(WIDTH / 2, y);
+        ctx.lineTo(WIDTH / 2, y + 20);
         ctx.stroke();
       }
     };
 
-    const draw = () => {
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    const drawCar = () => {
+      const grd = ctx.createLinearGradient(carX, carY, carX, carY + carHeight);
+      grd.addColorStop(0, "#ff5555");
+      grd.addColorStop(1, "#aa0000");
+      ctx.fillStyle = grd;
 
-      drawRoad();
-
-      // Xe
-      ctx.fillStyle = "red";
+      ctx.shadowColor = "black";
+      ctx.shadowBlur = 20;
       ctx.fillRect(carX, carY, carWidth, carHeight);
+      ctx.shadowBlur = 0;
+    };
 
-      // Obstacles
-      obstacles.forEach(obs => {
+    const drawObstacles = () => {
+      obstacles.forEach((obs) => {
         ctx.fillStyle = obs.color;
+        ctx.shadowColor = "black";
+        ctx.shadowBlur = 20;
         ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-      });
+        ctx.shadowBlur = 0;
 
-      // Score
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+      });
+    };
+
+    const drawUI = () => {
       ctx.fillStyle = "white";
-      ctx.font = "24px sans-serif";
-      ctx.fillText("Score: " + currentScore, 10, 30);
+      ctx.font = "24px Monospace";
+      ctx.fillText(`Score: ${currentScore}`, 10, 30);
 
       if (!started) {
         ctx.fillStyle = "yellow";
         ctx.font = "20px sans-serif";
-        ctx.fillText("Press Arrow or SPACE to start", WIDTH/2 - 130, HEIGHT/2);
+        ctx.fillText("Press ← → or SPACE to start", WIDTH / 2 - 130, HEIGHT / 2);
       }
     };
 
+    const drawMathQuestion = () => {
+      if (!showQuestion) return;
+
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(0, HEIGHT / 2 - 80, WIDTH, 160);
+
+      ctx.fillStyle = "white";
+      ctx.font = "28px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(question!, WIDTH / 2, HEIGHT / 2);
+
+      ctx.font = "20px sans-serif";
+      ctx.fillText("Nhập câu trả lời: " + answer, WIDTH / 2, HEIGHT / 2 + 40);
+      ctx.textAlign = "left";
+    };
+
     const update = () => {
-      if (!started || gameOver) return;
+      if (!started || gameOver || showQuestion) return;
 
-      obstacles.forEach(obs => obs.y += obstacleSpeed);
-      if (obstacles.length === 0 || obstacles[obstacles.length-1].y > 150) spawnObstacle();
-      if (obstacles.length && obstacles[0].y > HEIGHT) obstacles.shift();
+      // math question
+      const now = performance.now();
+      if (now >= nextQuestionTime) {
+        obstacleSpeedRef.current *= 0.5; // chậm lại
+        spawnMathQuestion();
+        nextQuestionTime = now + 7000 + Math.random() * 5000;
+      }
 
-      // Va chạm
+      // move obstacles
+      obstacles.forEach((obs) => (obs.y += obstacleSpeedRef.current));
+      if (obstacles.length === 0 || obstacles[obstacles.length - 1].y > 180) spawnObstacle();
+      if (obstacles[0]?.y > HEIGHT) obstacles.shift();
+
+      // collision
       for (const obs of obstacles) {
         if (
           carX < obs.x + obs.width &&
           carX + carWidth > obs.x &&
           carY < obs.y + obs.height &&
           carY + carHeight > obs.y
-        ) gameOver = true;
+        ) {
+          gameOver = true;
+        }
       }
 
-      obstacles.forEach(obs => {
+      obstacles.forEach((obs) => {
         if (!obs.passed && obs.y + obs.height > carY) {
           obs.passed = true;
           currentScore += 10;
@@ -214,18 +317,54 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
 
     const loop = () => {
       update();
-      draw();
+      drawRoad();
+      drawCar();
+      drawObstacles();
+      drawUI();
+      drawMathQuestion();
+
       if (!gameOver) animationRef.current = requestAnimationFrame(loop);
-      else if (started) saveScore(currentScore);
+      else saveScore(currentScore);
     };
 
     loop();
 
+    // handle typing math answer
+    const handleInput = (e: KeyboardEvent) => {
+      if (!showQuestion) return;
+
+      if (e.key === "Enter") {
+        handleAnswer();
+        return;
+      }
+
+      if (/[0-9-]/.test(e.key)) {
+        setAnswer((a) => a + e.key);
+      }
+
+      if (e.key === "Backspace") {
+        setAnswer((a) => a.slice(0, -1));
+      }
+    };
+
+    window.addEventListener("keydown", handleInput);
+
     return () => {
-      cancelAnimationFrame(animationRef.current);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleInput);
+      cancelAnimationFrame(animationRef.current);
     };
   }, []);
 
-  return <canvas ref={canvasRef} style={{ border: "2px solid black", display: "block", margin: "0 auto" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        border: "2px solid black",
+        display: "block",
+        margin: "0 auto",
+        borderRadius: "10px"
+      }}
+    />
+  );
 }
