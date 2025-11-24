@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
@@ -10,7 +11,7 @@ interface QuizResult {
   score: number
   total_questions: number
   completed_at: string
-  quiz: { title: string }
+  quizzes: { title: string } // join từ bảng quizzes
 }
 
 interface Profile {
@@ -28,23 +29,42 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
   const [totalPoints, setTotalPoints] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
+  const supabase = createClient()
+
   useEffect(() => {
     async function fetchData() {
       try {
+        setIsLoading(true)
+
         // 1️⃣ Lấy profile học sinh
-        const profileRes = await fetch(`/api/student/profile?student_id=${studentId}`)
-        const profileData = await profileRes.json()
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", studentId)
+          .single()
         setProfile(profileData)
 
-        // 2️⃣ Lấy kết quả quiz
-        const resultsRes = await fetch(`/api/student/quizResults?student_id=${studentId}`)
-        const resultsData = await resultsRes.json()
-        setResults(resultsData)
+        // 2️⃣ Lấy kết quả quiz từ bảng results và join quizzes để lấy title
+        const { data: resultsData } = await supabase
+          .from("results")
+          .select(`
+            id,
+            score,
+            total_questions,
+            completed_at,
+            quizzes!inner(title)
+          `)
+          .eq("user_id", studentId)
+          .order("completed_at", { ascending: false })
+        setResults(resultsData || [])
 
-        // 3️⃣ Lấy tổng điểm
-        const pointsRes = await fetch(`/api/student/totalPoints?student_id=${studentId}`)
-        const pointsData = await pointsRes.json()
-        setTotalPoints(pointsData.total_score ?? 0)
+        // 3️⃣ Lấy tổng điểm từ bảng user_totals
+        const { data: totalsData } = await supabase
+          .from("user_totals")
+          .select("total_score")
+          .eq("user_id", studentId)
+          .single()
+        setTotalPoints(totalsData?.total_score ?? 0)
       } catch (err) {
         console.error("Không thể tải dữ liệu:", err)
       } finally {
@@ -132,7 +152,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
                 return (
                   <div key={result.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{result.quiz.title}</h4>
+                      <h4 className="font-medium text-gray-900">{result.quizzes.title}</h4>
                       <p className="text-sm text-gray-500">
                         Hoàn thành: {new Date(result.completed_at).toLocaleDateString()}
                       </p>
