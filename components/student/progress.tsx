@@ -1,17 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@supabase/supabase-js"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
+
+// Supabase client trực tiếp
+const supabaseUrl = "https://byrguxinsefhcrvmkbow.supabase.co"
+const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // thay bằng anon key của bạn
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface QuizResult {
   id: string
   score: number
   total_questions: number
   completed_at: string
-  quizzes: { title: string } // join từ bảng quizzes
+  quiz_title: string
 }
 
 interface Profile {
@@ -29,23 +34,23 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
   const [totalPoints, setTotalPoints] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
-  const supabase = createClient()
-
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setIsLoading(true)
+    if (!studentId) return
 
-        // 1️⃣ Lấy profile học sinh
-        const { data: profileData } = await supabase
+    async function fetchData() {
+      setIsLoading(true)
+      try {
+        // 1️⃣ Profile
+        const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, email")
           .eq("id", studentId)
           .single()
+        if (profileError) throw profileError
         setProfile(profileData)
 
-        // 2️⃣ Lấy kết quả quiz từ bảng results và join quizzes để lấy title
-        const { data: resultsData } = await supabase
+        // 2️⃣ Results + lấy quiz title từ quizzes
+        const { data: resultsData, error: resultsError } = await supabase
           .from("results")
           .select(`
             id,
@@ -56,14 +61,25 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           `)
           .eq("user_id", studentId)
           .order("completed_at", { ascending: false })
-        setResults(resultsData || [])
+        if (resultsError) throw resultsError
 
-        // 3️⃣ Lấy tổng điểm từ bảng user_totals
-        const { data: totalsData } = await supabase
+        // Map lại để có quiz_title trực tiếp
+        const mappedResults = (resultsData || []).map((r: any) => ({
+          id: r.id,
+          score: r.score,
+          total_questions: r.total_questions,
+          completed_at: r.completed_at,
+          quiz_title: r.quizzes.title,
+        }))
+        setResults(mappedResults)
+
+        // 3️⃣ Total points
+        const { data: totalsData, error: totalsError } = await supabase
           .from("user_totals")
           .select("total_score")
           .eq("user_id", studentId)
           .single()
+        if (totalsError) throw totalsError
         setTotalPoints(totalsData?.total_score ?? 0)
       } catch (err) {
         console.error("Không thể tải dữ liệu:", err)
@@ -152,7 +168,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
                 return (
                   <div key={result.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{result.quizzes.title}</h4>
+                      <h4 className="font-medium text-gray-900">{result.quiz_title}</h4>
                       <p className="text-sm text-gray-500">
                         Hoàn thành: {new Date(result.completed_at).toLocaleDateString()}
                       </p>
