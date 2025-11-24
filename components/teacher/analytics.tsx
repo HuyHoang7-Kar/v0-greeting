@@ -1,9 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/client"
 
 interface QuizResult {
   id: string
@@ -19,40 +17,12 @@ interface QuizResult {
   }
 }
 
-export function TeacherAnalytics() {
-  const supabase = createClient()
-  const [results, setResults] = useState<QuizResult[]>([])
-  const [loading, setLoading] = useState(true)
+interface TeacherAnalyticsProps {
+  results: QuizResult[]
+}
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      setLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from("results")
-          .select(`
-            id,
-            score,
-            total_questions,
-            completed_at,
-            profiles!inner(full_name,email),
-            quizzes!inner(title)
-          `)
-
-        if (error) throw error
-        if (data) setResults(data as QuizResult[])
-      } catch (err) {
-        console.error("Error fetching results:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchResults()
-  }, [])
-
-  if (loading) return <p>Loading...</p>
-  if (results.length === 0) return <p>No quiz results found.</p>
+export function TeacherAnalytics({ results }: TeacherAnalyticsProps) {
+  if (!results || results.length === 0) return <p>Chưa có kết quả bài kiểm tra nào.</p>
 
   // Nhóm theo học sinh
   const studentsMap: Record<string, QuizResult[]> = {}
