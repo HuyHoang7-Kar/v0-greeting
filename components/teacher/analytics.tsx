@@ -1,8 +1,9 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 interface QuizResult {
   id: string
@@ -18,12 +19,42 @@ interface QuizResult {
   }
 }
 
-interface TeacherAnalyticsProps {
-  results: QuizResult[]
-}
+export function TeacherAnalytics() {
+  const supabase = createClient()
+  const [results, setResults] = useState<QuizResult[]>([])
+  const [loading, setLoading] = useState(true)
 
-export function TeacherAnalytics({ results }: TeacherAnalyticsProps) {
-  // Nhóm kết quả theo học sinh
+  useEffect(() => {
+    const fetchResults = async () => {
+      setLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from("results")
+          .select(`
+            id,
+            score,
+            total_questions,
+            completed_at,
+            profiles!inner(full_name,email),
+            quizzes!inner(title)
+          `)
+
+        if (error) throw error
+        if (data) setResults(data as QuizResult[])
+      } catch (err) {
+        console.error("Error fetching results:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchResults()
+  }, [])
+
+  if (loading) return <p>Loading...</p>
+  if (results.length === 0) return <p>No quiz results found.</p>
+
+  // Nhóm theo học sinh
   const studentsMap: Record<string, QuizResult[]> = {}
   results.forEach(result => {
     const key = result.profiles?.email || "Unknown"
@@ -47,31 +78,25 @@ export function TeacherAnalytics({ results }: TeacherAnalyticsProps) {
               <CardTitle>{fullName}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {studentResults.length === 0 ? (
-                <p className="text-gray-500 text-sm">No quizzes taken</p>
-              ) : (
-                <div className="space-y-2">
-                  {studentResults.map(result => {
-                    const percentage = Math.round((result.score / result.total_questions) * 100)
-                    return (
-                      <div key={result.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{result.quizzes?.title}</p>
-                          <p className="text-sm text-gray-500">
-                            Completed: {new Date(result.completed_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-gray-900">
-                            {result.score}/{result.total_questions}
-                          </span>
-                          <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+              {studentResults.map(result => {
+                const percentage = Math.round((result.score / result.total_questions) * 100)
+                return (
+                  <div key={result.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{result.quizzes?.title}</p>
+                      <p className="text-sm text-gray-500">
+                        Completed: {new Date(result.completed_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-900">
+                        {result.score}/{result.total_questions}
+                      </span>
+                      <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
+                    </div>
+                  </div>
+                )
+              })}
             </CardContent>
           </Card>
         )
