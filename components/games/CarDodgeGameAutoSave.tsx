@@ -31,40 +31,65 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
   const [correctAnswer, setCorrectAnswer] = useState<number | null>(null);
   const [showQuestion, setShowQuestion] = useState(false);
 
-  const spawnMathQuestion = () => {
-    const a = Math.floor(1 + Math.random() * 9);
-    const b = Math.floor(1 + Math.random() * 9);
-    const ops = ["+", "-", "*"];
-    const op = ops[Math.floor(Math.random() * ops.length)];
+  const generateMathQuestion = () => {
+    const type = Math.floor(Math.random() * 5); // 5 dạng toán
 
-    let result = 0;
-    if (op === "+") result = a + b;
-    if (op === "-") result = a - b;
-    if (op === "*") result = a * b;
+    let a = Math.floor(1 + Math.random() * 9);
+    let b = Math.floor(1 + Math.random() * 9);
+    let q = "";
+    let r = 0;
 
-    setQuestion(`${a} ${op} ${b} = ?`);
-    setCorrectAnswer(result);
+    switch (type) {
+      case 0:
+        q = `${a} + ${b} = ?`;
+        r = a + b;
+        break;
+
+      case 1:
+        q = `${a} - ${b} = ?`;
+        r = a - b;
+        break;
+
+      case 2:
+        q = `${a} × ${b} = ?`;
+        r = a * b;
+        break;
+
+      case 3:
+        // chia có nghiệm nguyên
+        r = a;
+        b = Math.floor(1 + Math.random() * 9);
+        a = a * b;
+        q = `${a} ÷ ${b} = ?`;
+        break;
+
+      case 4:
+        q = `${a}² = ?`;
+        r = a * a;
+        break;
+    }
+
+    setQuestion(q);
+    setCorrectAnswer(r);
     setAnswer("");
     setShowQuestion(true);
   };
 
   const handleAnswer = () => {
     if (Number(answer) === correctAnswer) {
-      // đúng
-      obstacleSpeedRef.current *= 1.4;
-      setScore((s) => s + 20);
+      obstacleSpeedRef.current *= 1.3; // thưởng: tăng tốc
+      setScore((s) => s + 30);
     } else {
-      // sai
-      obstacleSpeedRef.current *= 0.7;
+      obstacleSpeedRef.current *= 0.6; // phạt: chậm
       setTimeout(() => {
-        obstacleSpeedRef.current *= 1.3;
+        obstacleSpeedRef.current *= 1.4; // 5s sau trở lại tốc độ cũ
       }, 5000);
     }
     setShowQuestion(false);
   };
 
   // -------------------------
-  // SUPABASE GAME SAVE
+  // SUPABASE SAVE
   // -------------------------
 
   const getOrCreateGameId = async (): Promise<string | null> => {
@@ -80,8 +105,8 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
       .from("game")
       .insert({
         slug: gameSlug,
-        title: "Car Dodge Game",
-        description: "Xe vượt chướng ngại vật + toán học"
+        title: "Car Dodge Math Game",
+        description: "Xe né vật cản + bài toán"
       })
       .select("id")
       .single();
@@ -122,7 +147,9 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
         });
       } else {
         const newCount = oldScore.plays_count + 1;
-        const newAverage = (oldScore.average_score * oldScore.plays_count + finalScore) / newCount;
+        const newAverage =
+          (oldScore.average_score * oldScore.plays_count + finalScore) /
+          newCount;
 
         await supabase
           .from("game_scores")
@@ -191,25 +218,23 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
     window.addEventListener("keydown", handleKeyDown);
 
     const spawnObstacle = () => {
-      const width = 30 + Math.random() * 50;
+      const width = 35 + Math.random() * 40;
       const x = Math.random() * (WIDTH - width - 40) + 20;
       const color = ["#ff4b4b", "#3399ff", "#ffaa00", "#8e44ad"][Math.floor(Math.random() * 4)];
-      obstacles.push({ x, y: -50, width, height: 60, color });
+      obstacles.push({ x, y: -60, width, height: 70, color });
     };
 
     // -------------------------
-    // GRAPHICS
+    // VẼ ĐỒ HỌA
     // -------------------------
 
     const drawRoad = () => {
-      // Dark gradient road
       const grd = ctx.createLinearGradient(0, 0, 0, HEIGHT);
       grd.addColorStop(0, "#2e2e2e");
       grd.addColorStop(1, "#1b1b1b");
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // Lane lines
       ctx.strokeStyle = "white";
       ctx.lineWidth = 4;
 
@@ -265,47 +290,52 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
     const drawMathQuestion = () => {
       if (!showQuestion) return;
 
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(0, HEIGHT / 2 - 80, WIDTH, 160);
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.fillRect(0, HEIGHT / 2 - 90, WIDTH, 180);
 
       ctx.fillStyle = "white";
-      ctx.font = "28px sans-serif";
+      ctx.font = "30px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(question!, WIDTH / 2, HEIGHT / 2);
+      ctx.fillText(question!, WIDTH / 2, HEIGHT / 2 - 10);
 
-      ctx.font = "20px sans-serif";
-      ctx.fillText("Nhập câu trả lời: " + answer, WIDTH / 2, HEIGHT / 2 + 40);
+      ctx.font = "22px sans-serif";
+      ctx.fillText("Trả lời: " + answer, WIDTH / 2, HEIGHT / 2 + 40);
+
       ctx.textAlign = "left";
     };
+
+    // -------------------------
+    // UPDATE GAME
+    // -------------------------
 
     const update = () => {
       if (!started || gameOver || showQuestion) return;
 
-      // math question
       const now = performance.now();
+
+      // Xuất câu hỏi toán
       if (now >= nextQuestionTime) {
-        obstacleSpeedRef.current *= 0.5; // chậm lại
-        spawnMathQuestion();
-        nextQuestionTime = now + 7000 + Math.random() * 5000;
+        obstacleSpeedRef.current *= 0.4;
+        generateMathQuestion();
+        nextQuestionTime = now + 6000 + Math.random() * 4000;
       }
 
-      // move obstacles
+      // Di chuyển obstacle
       obstacles.forEach((obs) => (obs.y += obstacleSpeedRef.current));
       if (obstacles.length === 0 || obstacles[obstacles.length - 1].y > 180) spawnObstacle();
       if (obstacles[0]?.y > HEIGHT) obstacles.shift();
 
-      // collision
+      // Va chạm
       for (const obs of obstacles) {
         if (
           carX < obs.x + obs.width &&
           carX + carWidth > obs.x &&
           carY < obs.y + obs.height &&
           carY + carHeight > obs.y
-        ) {
-          gameOver = true;
-        }
+        ) gameOver = true;
       }
 
+      // tính điểm
       obstacles.forEach((obs) => {
         if (!obs.passed && obs.y + obs.height > carY) {
           obs.passed = true;
@@ -329,7 +359,7 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
 
     loop();
 
-    // handle typing math answer
+    // Nhập số cho câu hỏi toán
     const handleInput = (e: KeyboardEvent) => {
       if (!showQuestion) return;
 
@@ -338,13 +368,8 @@ export function CarDodgeGameAutoSave({ gameSlug = "car-dodge", onGameComplete }:
         return;
       }
 
-      if (/[0-9-]/.test(e.key)) {
-        setAnswer((a) => a + e.key);
-      }
-
-      if (e.key === "Backspace") {
-        setAnswer((a) => a.slice(0, -1));
-      }
+      if (/[0-9-]/.test(e.key)) setAnswer((a) => a + e.key);
+      if (e.key === "Backspace") setAnswer((a) => a.slice(0, -1));
     };
 
     window.addEventListener("keydown", handleInput);
