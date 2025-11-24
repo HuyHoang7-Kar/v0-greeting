@@ -12,9 +12,7 @@ import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
-import { Leaderboard } from "@/components/rewards/leaderboard"
-import { UserProfile } from "@/components/rewards/user-profile"
-import { BookOpen, Brain, FileText, TrendingUp, Play, LogOut, User, Gamepad2, Trophy, Medal } from "lucide-react"
+import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface Profile {
@@ -56,27 +54,27 @@ export function StudentDashboard() {
 
       setUser(user)
 
-      // 🧩 Lấy profile
+      // Lấy profile
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
       setProfile(profileData)
 
-      // 🧩 Lấy flashcards
+      // Lấy flashcards
       const { data: flashcardsData } = await supabase
         .from("flashcards")
         .select("*")
         .order("created_at", { ascending: false })
 
-      // 🧩 Lấy quizzes
+      // Lấy quizzes
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
 
-      // 🧩 Lấy notes của user
+      // Lấy notes
       const { data: notesData } = await supabase
         .from("notes")
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
-      // 🧩 Lấy kết quả quiz
+      // Lấy kết quả quiz
       const { data: resultsData } = await supabase
         .from("results")
         .select(
@@ -88,8 +86,8 @@ export function StudentDashboard() {
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false })
 
-      // 🧩 Lấy điểm user
-      const { data: pointsData } = await supabase.from("user_points").select("*").eq("user_id", user.id).single()
+      // Lấy điểm user
+      const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
 
       setFlashcards(flashcardsData || [])
       setQuizzes(quizzesData || [])
@@ -164,7 +162,7 @@ export function StudentDashboard() {
               {userPoints && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   <Medal className="w-3 h-3 mr-1" />
-                  {userPoints.total_points || 0} điểm
+                  {userPoints.total_score || 0} điểm
                 </Badge>
               )}
             </div>
@@ -183,7 +181,7 @@ export function StudentDashboard() {
             { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" },
             { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" },
             { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" },
-            { label: "Điểm Tổng", value: userPoints?.total_points || 0, icon: Trophy, color: "purple" },
+            { label: "Điểm Tổng", value: userPoints?.total_score || 0, icon: Trophy, color: "purple" },
           ].map(({ label, value, icon: Icon, color }, idx) => (
             <Card
               key={idx}
@@ -204,7 +202,7 @@ export function StudentDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white border-2 border-gray-200">
+          <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
             <TabsTrigger value="flashcards">
               <BookOpen className="w-4 h-4" /> Thẻ Học
             </TabsTrigger>
@@ -219,9 +217,6 @@ export function StudentDashboard() {
             </TabsTrigger>
             <TabsTrigger value="progress">
               <TrendingUp className="w-4 h-4" /> Tiến Độ
-            </TabsTrigger>
-            <TabsTrigger value="leaderboard">
-              <Trophy className="w-4 h-4" /> Xếp Hạng
             </TabsTrigger>
           </TabsList>
 
@@ -244,13 +239,14 @@ export function StudentDashboard() {
 
           <TabsContent value="progress">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <StudentProgress results={results} />
-              <UserProfile profile={profile} userPoints={userPoints} />
+              <StudentProgress results={results} quizzes={quizzes} />
+              <div className="p-4 border rounded-lg bg-white shadow">
+                <h2 className="text-xl font-bold mb-2">Thông Tin Cá Nhân</h2>
+                <p>Họ Tên: {profile?.full_name}</p>
+                <p>Email: {profile?.email}</p>
+                <p>Điểm Tổng: {userPoints?.total_score || 0}</p>
+              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="leaderboard">
-            <Leaderboard />
           </TabsContent>
         </Tabs>
       </div>
