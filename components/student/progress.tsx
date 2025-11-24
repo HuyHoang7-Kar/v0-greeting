@@ -13,38 +13,38 @@ interface QuizResult {
   quiz: { title: string }
 }
 
-interface StudentProgressProps {
-  studentId: string
-}
-
 interface Profile {
   full_name: string
   email: string
 }
 
+interface StudentProgressProps {
+  studentId: string
+}
+
 export function StudentProgress({ studentId }: StudentProgressProps) {
-  const [results, setResults] = useState<QuizResult[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [results, setResults] = useState<QuizResult[]>([])
   const [totalPoints, setTotalPoints] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // 1️⃣ Lấy thông tin học sinh
+        // 1️⃣ Lấy profile học sinh
         const profileRes = await fetch(`/api/student/profile?student_id=${studentId}`)
         const profileData = await profileRes.json()
         setProfile(profileData)
 
-        // 2️⃣ Lấy kết quả quiz của học sinh
-        const resultsRes = await fetch(`/api/student/results?student_id=${studentId}`)
+        // 2️⃣ Lấy kết quả quiz
+        const resultsRes = await fetch(`/api/student/quizResults?student_id=${studentId}`)
         const resultsData = await resultsRes.json()
         setResults(resultsData)
 
-        // 3️⃣ Lấy tổng điểm học sinh
-        const totalPointsRes = await fetch(`/api/student/getPoints?student_id=${studentId}`)
-        const totalPointsData = await totalPointsRes.json()
-        setTotalPoints(totalPointsData.total_score ?? 0)
+        // 3️⃣ Lấy tổng điểm
+        const pointsRes = await fetch(`/api/student/totalPoints?student_id=${studentId}`)
+        const pointsData = await pointsRes.json()
+        setTotalPoints(pointsData.total_score ?? 0)
       } catch (err) {
         console.error("Không thể tải dữ liệu:", err)
       } finally {
