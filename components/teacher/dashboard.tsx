@@ -42,28 +42,24 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     try {
       const supabase = createClient()
 
-      // Load teacher's flashcards
       const { data: flashcardsData } = await supabase
         .from("flashcards")
         .select("*")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
 
-      // Load teacher's quizzes
       const { data: quizzesData } = await supabase
         .from("quizzes")
         .select("*")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
 
-      // Load all students
       const { data: studentsData } = await supabase
         .from("profiles")
         .select("*")
         .eq("role", "student")
         .order("created_at", { ascending: false })
 
-      // Load all quiz results for analytics
       const { data: resultsData } = await supabase
         .from("results")
         .select(`
@@ -301,9 +297,10 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             )}
           </TabsContent>
 
+          {/* Chỉnh TeacherAnalytics */}
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Phân Tích Học Tập</h2>
-            <TeacherAnalytics results={results} quizzes={quizzes} />
+            <TeacherAnalytics results={results} />
           </TabsContent>
         </Tabs>
       </div>
