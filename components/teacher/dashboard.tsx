@@ -62,16 +62,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
       const { data: resultsData } = await supabase
         .from("results")
-        .select(`
-          *,
-          profiles (
-            full_name,
-            email
-          ),
-          quizzes (
-            title
-          )
-        `)
+        .select("*")
         .order("completed_at", { ascending: false })
 
       setFlashcards(flashcardsData || [])
@@ -278,7 +269,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Lượt làm bài:</span>
                         <span className="text-gray-900">
-                          {results.filter((r) => r.profiles?.email === student.email).length}
+                          {results.filter((r) => r.user_id === student.id).length}
                         </span>
                       </div>
                     </div>
@@ -286,21 +277,12 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                 </Card>
               ))}
             </div>
-            {students.length === 0 && (
-              <Card className="border-2 border-gray-200">
-                <CardContent className="p-12 text-center">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 text-lg">Chưa có học sinh nào đăng ký</p>
-                  <p className="text-gray-400 text-sm mt-2">Học sinh sẽ xuất hiện ở đây khi họ đăng ký!</p>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
-          {/* Chỉnh TeacherAnalytics */}
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Phân Tích Học Tập</h2>
-            <TeacherAnalytics results={results} />
+            {/* Truyền thêm students và quizzes để map đúng */}
+            <TeacherAnalytics results={results} students={students} quizzes={quizzes} />
           </TabsContent>
         </Tabs>
       </div>
