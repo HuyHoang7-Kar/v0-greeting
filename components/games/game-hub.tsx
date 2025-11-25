@@ -99,7 +99,7 @@ export function GameHub() {
       name: "Runner Game",
       description: "Game chạy né vật cản + vật lý.",
       icon: Rocket,
-      component: RunnerGame,
+      component: PhysicsPuzzleGame,
       props: {
         onBack: () => setSelectedGame(null),
       }
