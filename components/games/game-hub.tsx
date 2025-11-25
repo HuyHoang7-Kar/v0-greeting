@@ -14,7 +14,7 @@ import { FlappyBirdGame } from "./FlappyGameAutoSave"
 import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave"
 
 // ⬇️ THÊM GAME MỚI
-import { RunnerGame } from "./RunnerGame"
+import { PhysicsPuzzleGame } from "./RunnerGame"
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
