@@ -11,7 +11,10 @@ import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
 import { FlappyBirdGame } from "./FlappyGameAutoSave" 
-import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave" // <-- Thêm trò Car Dodge
+import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave"
+
+// ⬇️ THÊM GAME MỚI
+import { RunnerGame } from "./RunnerGame"
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -87,7 +90,19 @@ export function GameHub() {
       name: "Car Dodge AutoSave",
       description: "Xe né chướng ngại vật, tự động lưu điểm.",
       icon: Rocket,
-      component: CarDodgeGameAutoSave, // <-- Thêm Car Dodge
+      component: CarDodgeGameAutoSave,
+    },
+
+    // ⬇️ GAME RUNNER — ĐÃ THÊM VÀO ĐÂY
+    {
+      id: "runner",
+      name: "Runner Game",
+      description: "Game chạy né vật cản + vật lý.",
+      icon: Rocket,
+      component: RunnerGame,
+      props: {
+        onBack: () => setSelectedGame(null),
+      }
     },
   ]
 
