@@ -25,9 +25,7 @@ interface Profile {
   class_name?: string
 }
 
-export function StudentDashboard() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+export function StudentDashboard({ user, profile }: { user: any; profile: any }) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
@@ -46,17 +44,6 @@ export function StudentDashboard() {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true)
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-      if (userError || !user) throw new Error("User not authenticated")
-
-      setUser(user)
-
-      // Lấy profile
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-      setProfile(profileData)
 
       // Lấy flashcards
       const { data: flashcardsData } = await supabase
@@ -81,7 +68,7 @@ export function StudentDashboard() {
           `
           *,
           quizzes ( title )
-        `
+        `,
         )
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false })
@@ -166,7 +153,12 @@ export function StudentDashboard() {
                 </Badge>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+              className="flex items-center gap-2 bg-transparent"
+            >
               <LogOut className="w-4 h-4" />
               Đăng Xuất
             </Button>
