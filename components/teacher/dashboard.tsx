@@ -12,6 +12,7 @@ import { TeacherQuizzes } from "@/components/teacher/quizzes"
 import { TeacherAnalytics } from "@/components/teacher/analytics"
 import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { CreateClassForm } from "@/components/teacher/create-class-form"
 
 interface Profile {
   id: string
@@ -25,13 +26,23 @@ interface TeacherDashboardProps {
   profile: Profile
 }
 
+interface Class {
+  id: string
+  name: string
+  description?: string
+  teacher_id: string
+  created_at: string
+}
+
 export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
+  const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showCreateFlashcardForm, setShowCreateFlashcardForm] = useState(false)
+  const [showCreateClassForm, setShowCreateClassForm] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -65,10 +76,17 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
         .select("*")
         .order("completed_at", { ascending: false })
 
+      const { data: classesData } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("teacher_id", user.id)
+        .order("created_at", { ascending: false })
+
       setFlashcards(flashcardsData || [])
       setQuizzes(quizzesData || [])
       setStudents(studentsData || [])
       setResults(resultsData || [])
+      setClasses(classesData || [])
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -83,7 +101,12 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
   }
 
   const handleFlashcardCreated = () => {
-    setShowCreateForm(false)
+    setShowCreateFlashcardForm(false)
+    loadDashboardData()
+  }
+
+  const handleClassCreated = () => {
+    setShowCreateClassForm(false)
     loadDashboardData()
   }
 
@@ -135,50 +158,42 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Thẻ Học Của Tôi</p>
-                  <p className="text-3xl font-bold text-gray-900">{flashcards.length}</p>
-                </div>
-                <BookOpen className="w-8 h-8 text-yellow-600" />
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Thẻ Học Của Tôi</p>
+                <p className="text-3xl font-bold text-gray-900">{flashcards.length}</p>
               </div>
+              <BookOpen className="w-8 h-8 text-yellow-600" />
             </CardContent>
           </Card>
 
           <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Bài Kiểm Tra Của Tôi</p>
-                  <p className="text-3xl font-bold text-gray-900">{quizzes.length}</p>
-                </div>
-                <Brain className="w-8 h-8 text-blue-600" />
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Bài Kiểm Tra Của Tôi</p>
+                <p className="text-3xl font-bold text-gray-900">{quizzes.length}</p>
               </div>
+              <Brain className="w-8 h-8 text-blue-600" />
             </CardContent>
           </Card>
 
           <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Tổng Học Sinh</p>
-                  <p className="text-3xl font-bold text-gray-900">{students.length}</p>
-                </div>
-                <Users className="w-8 h-8 text-green-600" />
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tổng Học Sinh</p>
+                <p className="text-3xl font-bold text-gray-900">{students.length}</p>
               </div>
+              <Users className="w-8 h-8 text-green-600" />
             </CardContent>
           </Card>
 
           <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Lượt Làm Bài</p>
-                  <p className="text-3xl font-bold text-gray-900">{results.length}</p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-purple-600" />
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Lượt Làm Bài</p>
+                <p className="text-3xl font-bold text-gray-900">{results.length}</p>
               </div>
+              <BarChart3 className="w-8 h-8 text-purple-600" />
             </CardContent>
           </Card>
         </div>
@@ -186,26 +201,24 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
         {/* Quick Actions */}
         <div className="mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Tạo Nội Dung Mới</h3>
-                  <p className="text-gray-600">Thêm thẻ học và bài kiểm tra để giúp học sinh học tập hiệu quả hơn.</p>
-                </div>
-                <Button
-                  onClick={() => setShowCreateForm(!showCreateForm)}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  {showCreateForm ? "Ẩn Form" : "Tạo Thẻ Học"}
-                </Button>
+            <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Tạo Nội Dung Mới</h3>
+                <p className="text-gray-600">Thêm thẻ học và bài kiểm tra để giúp học sinh học tập hiệu quả hơn.</p>
               </div>
+              <Button
+                onClick={() => setShowCreateFlashcardForm(!showCreateFlashcardForm)}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                {showCreateFlashcardForm ? "Ẩn Form" : "Tạo Thẻ Học"}
+              </Button>
             </CardContent>
           </Card>
         </div>
 
         {/* Create Flashcard Form */}
-        {showCreateForm && (
+        {showCreateFlashcardForm && (
           <div className="mb-8">
             <CreateFlashcardForm onSuccess={handleFlashcardCreated} />
           </div>
@@ -213,30 +226,20 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-gray-200">
-            <TabsTrigger value="flashcards" className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4" />
-              Thẻ Học
-            </TabsTrigger>
-            <TabsTrigger value="quizzes" className="flex items-center gap-2">
-              <Brain className="w-4 h-4" />
-              Kiểm Tra
-            </TabsTrigger>
-            <TabsTrigger value="students" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Học Sinh
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Phân Tích
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
+            <TabsTrigger value="flashcards" className="flex items-center gap-2"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
+            <TabsTrigger value="quizzes" className="flex items-center gap-2"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
+            <TabsTrigger value="students" className="flex items-center gap-2"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
+            <TabsTrigger value="classes" className="flex items-center gap-2"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
+          {/* Flashcards Tab */}
           <TabsContent value="flashcards" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Thẻ Học Của Tôi</h2>
               <Button
-                onClick={() => setShowCreateForm(!showCreateForm)}
+                onClick={() => setShowCreateFlashcardForm(!showCreateFlashcardForm)}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
@@ -246,18 +249,20 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             <TeacherFlashcards flashcards={flashcards} onFlashcardsChange={loadDashboardData} />
           </TabsContent>
 
+          {/* Quizzes Tab */}
           <TabsContent value="quizzes" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Bài Kiểm Tra Của Tôi</h2>
             <TeacherQuizzes quizzes={quizzes} onQuizzesChange={loadDashboardData} />
           </TabsContent>
 
+          {/* Students Tab */}
           <TabsContent value="students" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Tổng Quan Học Sinh</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {students.map((student) => (
                 <Card key={student.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
                   <CardHeader>
-                    <CardTitle className="text-lg text-gray-900">{student.full_name || student.email}</CardTitle>
+                    <CardTitle>{student.full_name || student.email}</CardTitle>
                     <CardDescription>{student.email}</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -268,9 +273,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Lượt làm bài:</span>
-                        <span className="text-gray-900">
-                          {results.filter((r) => r.user_id === student.id).length}
-                        </span>
+                        <span className="text-gray-900">{results.filter((r) => r.user_id === student.id).length}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -279,10 +282,43 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             </div>
           </TabsContent>
 
+          {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Phân Tích Học Tập</h2>
-            {/* Truyền thêm students và quizzes để map đúng */}
             <TeacherAnalytics results={results} students={students} quizzes={quizzes} />
+          </TabsContent>
+
+          {/* Classes Tab */}
+          <TabsContent value="classes" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Lớp Học Của Tôi</h2>
+              <Button
+                onClick={() => setShowCreateClassForm(!showCreateClassForm)}
+                className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> {showCreateClassForm ? "Hủy" : "Tạo Lớp"}
+              </Button>
+            </div>
+
+            {showCreateClassForm && (
+              <CreateClassForm onSuccess={handleClassCreated} />
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {classes.map((cls) => (
+                <Card key={cls.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle>{cls.name}</CardTitle>
+                    <CardDescription>{cls.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-600">
+                      Thời gian tạo: {new Date(cls.created_at).toLocaleDateString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
         </Tabs>
       </div>
