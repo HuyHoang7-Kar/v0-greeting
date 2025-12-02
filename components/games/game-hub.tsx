@@ -10,11 +10,14 @@ import { MemoryMatchGame } from "./memory-match-game"
 import { WordMeaningMatchGame } from "./word-meaning-match-game"
 import { MathCalculatorGame } from "./math-calculator-game"
 import { PlatformerGame } from "./platformer-game"
-import { FlappyBirdGame } from "./FlappyGameAutoSave" 
+import { FlappyBirdGame } from "./FlappyGameAutoSave"
 import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave"
 
-// ⬇️ THÊM GAME MỚI
-import  PhysicsPuzzleGame from "./RunnerGame"
+// Game runner
+import PhysicsPuzzleGame from "./RunnerGame"
+
+// 🐰 Thêm game Rabbit Math
+import { RabbitMathGame } from "./RabbitMathGame"
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
@@ -71,6 +74,20 @@ export function GameHub() {
         onGameComplete: (score: number) => console.log("Math Calculator score:", score)
       },
     },
+
+    // 🐰 Rabbit Math Game (đã thêm)
+    {
+      id: "rabbit-math",
+      name: "Rabbit Math",
+      description: "Giải toán cùng chú thỏ nhí nhảnh.",
+      icon: Calculator,
+      component: RabbitMathGame,
+      props: {
+        gameId: "rabbit-math-1",
+        onGameComplete: (score: number) => console.log("Rabbit Math score:", score),
+      },
+    },
+
     {
       id: "platformer",
       name: "Platformer Game",
@@ -93,7 +110,6 @@ export function GameHub() {
       component: CarDodgeGameAutoSave,
     },
 
-    // ⬇️ GAME RUNNER — ĐÃ THÊM VÀO ĐÂY
     {
       id: "runner",
       name: "Runner Game",
