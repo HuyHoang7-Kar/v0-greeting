@@ -17,7 +17,8 @@ import { CarDodgeGameAutoSave } from "./CarDodgeGameAutoSave"
 import PhysicsPuzzleGame from "./RunnerGame"
 
 // 🐰 Thêm game Rabbit Math
-import { RabbitMathGame } from "./RabbitMathGame"
+import RabbitMathGame from "./RabbitMathGame"
+
 
 export function GameHub() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null)
