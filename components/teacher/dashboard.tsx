@@ -12,7 +12,7 @@ import { TeacherQuizzes } from "@/components/teacher/quizzes"
 import { TeacherAnalytics } from "@/components/teacher/analytics"
 import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { CreateClassForm } from "@/components/teacher/create-class-form"
+import { CreateClassForm } from "@/components/teacher/CreateClassForm"
 
 interface Profile {
   id: string
