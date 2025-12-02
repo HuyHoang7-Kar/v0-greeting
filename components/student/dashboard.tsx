@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { FlashcardGrid } from "@/components/student/flashcard-grid"
@@ -12,7 +12,7 @@ import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
-import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal } from "lucide-react"
+import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface Profile {
@@ -22,14 +22,23 @@ interface Profile {
   role: string
   avatar_url?: string
   bio?: string
-  class_name?: string
 }
 
-export function StudentDashboard({ user, profile }: { user: any; profile: any }) {
+interface Class {
+  id: string
+  name: string
+  description?: string
+  teacher_id: string
+  created_at: string
+}
+
+export function StudentDashboard({ user, profile }: { user: any; profile: Profile }) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
+  const [classes, setClasses] = useState<Class[]>([])
+  const [myClasses, setMyClasses] = useState<string[]>([]) // IDs của lớp đã tham gia
   const [userPoints, setUserPoints] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
@@ -45,42 +54,28 @@ export function StudentDashboard({ user, profile }: { user: any; profile: any })
     try {
       setIsLoading(true)
 
-      // Lấy flashcards
-      const { data: flashcardsData } = await supabase
-        .from("flashcards")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      // Lấy quizzes
+      const { data: flashcardsData } = await supabase.from("flashcards").select("*").order("created_at", { ascending: false })
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
-
-      // Lấy notes
-      const { data: notesData } = await supabase
-        .from("notes")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-
-      // Lấy kết quả quiz
+      const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("updated_at", { ascending: false })
       const { data: resultsData } = await supabase
         .from("results")
-        .select(
-          `
-          *,
-          quizzes ( title )
-        `,
-        )
+        .select(`*, quizzes(title)`)
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false })
-
-      // Lấy điểm user
       const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
+
+      // Lấy danh sách lớp
+      const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
+      // Lấy lớp mà học sinh đã tham gia
+      const { data: myClassesData } = await supabase.from("class_students").select("class_id").eq("student_id", user.id)
 
       setFlashcards(flashcardsData || [])
       setQuizzes(quizzesData || [])
       setNotes(notesData || [])
       setResults(resultsData || [])
       setUserPoints(pointsData)
+      setClasses(classesData || [])
+      setMyClasses(myClassesData?.map((c) => c.class_id) || [])
     } catch (error) {
       console.error("❌ Lỗi load dashboard:", error)
     } finally {
@@ -96,6 +91,15 @@ export function StudentDashboard({ user, profile }: { user: any; profile: any })
   const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
+  }
+
+  const handleJoinClass = async (classId: string) => {
+    try {
+      await supabase.from("class_students").insert({ class_id: classId, student_id: user.id })
+      setMyClasses([...myClasses, classId])
+    } catch (error) {
+      console.error("❌ Lỗi tham gia lớp:", error)
+    }
   }
 
   if (isLoading) {
@@ -140,27 +144,16 @@ export function StudentDashboard({ user, profile }: { user: any; profile: any })
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-700">
-                {profile?.full_name || profile?.email || user?.email || "Người dùng"}
-              </span>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Học Sinh
-              </Badge>
+              <span className="text-sm text-gray-700">{profile?.full_name || profile?.email || user?.email}</span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">Học Sinh</Badge>
               {userPoints && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  <Medal className="w-3 h-3 mr-1" />
-                  {userPoints.total_score || 0} điểm
+                  <Medal className="w-3 h-3 mr-1" /> {userPoints.total_score || 0} điểm
                 </Badge>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="flex items-center gap-2 bg-transparent"
-            >
-              <LogOut className="w-4 h-4" />
-              Đăng Xuất
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2 bg-transparent">
+              <LogOut className="w-4 h-4" /> Đăng Xuất
             </Button>
           </div>
         </div>
@@ -169,24 +162,19 @@ export function StudentDashboard({ user, profile }: { user: any; profile: any })
       <div className="container mx-auto px-4 py-8">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {[
+          {[ 
             { label: "Thẻ Học Có Sẵn", value: flashcards.length, icon: BookOpen, color: "yellow" },
             { label: "Bài Kiểm Tra", value: quizzes.length, icon: Brain, color: "blue" },
             { label: "Ghi Chú Của Tôi", value: notes.length, icon: FileText, color: "green" },
-            { label: "Điểm Tổng", value: userPoints?.total_score || 0, icon: Trophy, color: "purple" },
+            { label: "Điểm Tổng", value: userPoints?.total_score || 0, icon: Trophy, color: "purple" }
           ].map(({ label, value, icon: Icon, color }, idx) => (
-            <Card
-              key={idx}
-              className={`border-2 border-${color}-200 bg-gradient-to-br from-${color}-50 to-${color}-100`}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{label}</p>
-                    <p className="text-3xl font-bold text-gray-900">{value}</p>
-                  </div>
-                  <Icon className={`w-8 h-8 text-${color}-600`} />
+            <Card key={idx} className={`border-2 border-${color}-200 bg-gradient-to-br from-${color}-50 to-${color}-100`}>
+              <CardContent className="p-6 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{label}</p>
+                  <p className="text-3xl font-bold text-gray-900">{value}</p>
                 </div>
+                <Icon className={`w-8 h-8 text-${color}-600`} />
               </CardContent>
             </Card>
           ))}
@@ -194,50 +182,45 @@ export function StudentDashboard({ user, profile }: { user: any; profile: any })
 
         {/* Main Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
-            <TabsTrigger value="flashcards">
-              <BookOpen className="w-4 h-4" /> Thẻ Học
-            </TabsTrigger>
-            <TabsTrigger value="games">
-              <Gamepad2 className="w-4 h-4" /> Trò Chơi
-            </TabsTrigger>
-            <TabsTrigger value="quizzes">
-              <Brain className="w-4 h-4" /> Kiểm Tra
-            </TabsTrigger>
-            <TabsTrigger value="notes">
-              <FileText className="w-4 h-4" /> Ghi Chú
-            </TabsTrigger>
-            <TabsTrigger value="progress">
-              <TrendingUp className="w-4 h-4" /> Tiến Độ
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-6 bg-white border-2 border-gray-200">
+            <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
+            <TabsTrigger value="games"><Gamepad2 className="w-4 h-4" /> Trò Chơi</TabsTrigger>
+            <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
+            <TabsTrigger value="notes"><FileText className="w-4 h-4" /> Ghi Chú</TabsTrigger>
+            <TabsTrigger value="progress"><TrendingUp className="w-4 h-4" /> Tiến Độ</TabsTrigger>
+            <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="flashcards">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Thẻ Học Có Sẵn</h2>
-            <FlashcardGrid flashcards={flashcards} />
-          </TabsContent>
+          {/* Flashcards Tab */}
+          <TabsContent value="flashcards"><FlashcardGrid flashcards={flashcards} /></TabsContent>
+          <TabsContent value="games"><GameHub /></TabsContent>
+          <TabsContent value="quizzes"><StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} /></TabsContent>
+          <TabsContent value="notes"><StudentNotes notes={notes} onNotesChange={loadDashboardData} /></TabsContent>
+          <TabsContent value="progress"><StudentProgress results={results} quizzes={quizzes} /></TabsContent>
 
-          <TabsContent value="games">
-            <GameHub />
-          </TabsContent>
-
-          <TabsContent value="quizzes">
-            <StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} />
-          </TabsContent>
-
-          <TabsContent value="notes">
-            <StudentNotes notes={notes} onNotesChange={loadDashboardData} />
-          </TabsContent>
-
-          <TabsContent value="progress">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <StudentProgress results={results} quizzes={quizzes} />
-              <div className="p-4 border rounded-lg bg-white shadow">
-                <h2 className="text-xl font-bold mb-2">Thông Tin Cá Nhân</h2>
-                <p>Họ Tên: {profile?.full_name}</p>
-                <p>Email: {profile?.email}</p>
-                <p>Điểm Tổng: {userPoints?.total_score || 0}</p>
-              </div>
+          {/* Classes Tab */}
+          <TabsContent value="classes" className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {classes.map((cls) => {
+                const joined = myClasses.includes(cls.id)
+                return (
+                  <Card key={cls.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <CardTitle>{cls.name}</CardTitle>
+                      <CardDescription>{cls.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}</span>
+                      {joined ? (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Đã tham gia</Badge>
+                      ) : (
+                        <Button size="sm" onClick={() => handleJoinClass(cls.id)}>Tham Gia</Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </TabsContent>
         </Tabs>
