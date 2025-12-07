@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,9 +23,11 @@ interface TeacherQuizzesProps {
 }
 
 export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps) {
+  const supabase = createClient() // tạo client Supabase
   const [selectedQuiz, setSelectedQuiz] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
+  // Xóa quiz và các câu hỏi liên quan
   const handleDeleteQuiz = async (id: string) => {
     if (!confirm("Are you sure you want to delete this quiz and all its questions?")) return
     setIsDeleting(id)
@@ -43,7 +45,6 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         .delete()
         .eq("quiz_id", id)
         .eq("created_by", user.id)
-
       if (delQuestionsError) throw delQuestionsError
 
       // Xóa quiz (chỉ xóa quiz do user tạo)
@@ -52,7 +53,6 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         .delete()
         .eq("id", id)
         .eq("created_by", user.id)
-
       if (delQuizError) throw delQuizError
 
       onQuizzesChange()
@@ -79,6 +79,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-gray-600">Create and manage quizzes for your students.</p>
         <Button
@@ -89,6 +90,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         </Button>
       </div>
 
+      {/* No quizzes */}
       {quizzes.length === 0 ? (
         <Card className="border-2 border-gray-200 p-12 text-center">
           <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
