@@ -26,7 +26,7 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Lấy danh sách lớp của user
+  // Lấy danh sách lớp mà giáo viên tạo
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -35,19 +35,14 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
         if (!user) return
 
         const { data, error } = await supabase
-          .from("class_members")
-          .select("class_id, classes!inner(name)")
-          .eq("user_id", user.id)
+          .from("classes")
+          .select("id, name")
+          .eq("created_by", user.id)  // chỉ lấy lớp do giáo viên tạo
         
         if (error) throw error
 
-        const mapped = (data || []).map((c: any) => ({
-          id: c.class_id,
-          name: c.classes.name,
-        }))
-
-        setClasses(mapped)
-        if (mapped.length > 0) setClassId(mapped[0].id)
+        setClasses(data || [])
+        if ((data || []).length > 0) setClassId(data![0].id)
       } catch (err: any) {
         console.error("Error fetching classes:", err)
       }
@@ -161,7 +156,7 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
           <div className="space-y-2 mt-2">
             <Label htmlFor="class" className="text-sm font-medium text-gray-700">Class *</Label>
             {classes.length === 0 ? (
-              <div className="p-2 text-sm text-gray-500">You are not part of any class</div>
+              <div className="p-2 text-sm text-gray-500">You have not created any classes yet</div>
             ) : (
               <Select value={classId || ""} onValueChange={(v) => setClassId(v)}>
                 <SelectTrigger>
