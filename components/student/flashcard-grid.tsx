@@ -125,7 +125,6 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
-  // Component flashcard lớn, đẹp
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
 
@@ -145,8 +144,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div
             className="absolute inset-0 rounded-xl border"
             style={{
-              background: "linear-gradient(145deg, #fffaf3, #fef7ee)", // màu ngọc sữa
-              border: "2px solid rgba(255, 215, 180, 0.7)", // foil vàng nhẹ
+              background: "linear-gradient(145deg, #fffaf3, #fef7ee)",
+              border: "2px solid rgba(255, 215, 180, 0.7)",
               boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
               backfaceVisibility: "hidden",
               display: "flex",
@@ -159,68 +158,30 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
               position: "relative",
             }}
           >
-            {/* watercolor góc trên */}
-            <div
-              style={{
-                position: "absolute",
-                top: "0.5rem",
-                right: "0.5rem",
-                width: "60px",
-                height: "60px",
-                background: "radial-gradient(circle at center, #a0c4ff55, #bdb2ff33)",
-                borderRadius: "50%",
-              }}
-            />
             <h3 className="text-center text-2xl font-bold">{flashcard.question}</h3>
-            <div
-              style={{
-                position: "absolute",
-                top: "0.5rem",
-                left: "0.5rem",
-                fontSize: "1rem",
-                color: "rgba(255, 215, 180, 0.9)",
-              }}
-            >
-              ✒️
-            </div>
             <p className="mt-auto text-base text-gray-500 text-center">Click để xem đáp án</p>
           </div>
 
           {/* Back */}
           <div
-            className="absolute inset-0 rounded-xl border rotate-y-180"
+            className="absolute inset-0 rounded-xl border rotate-y-180 flex flex-col justify-center items-center"
             style={{
               background: "#fffdf8",
               border: "2px solid rgba(255, 215, 180, 0.7)",
               boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "flex-start",
               padding: "2rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
-              position: "relative",
             }}
           >
-            <h3 className="text-center text-2xl font-bold mb-3">Đáp án</h3>
-            <ul className="text-base text-gray-700 list-inside" style={{ listStyleType: "circle" }}>
+            <h3 className="text-center text-3xl font-bold mb-4">ĐÁP ÁN</h3>
+            <div className="text-center text-2xl leading-relaxed">
               {flashcard.answer.split("\n").map((line, idx) => (
-                <li key={idx} className="mb-1">{line}</li>
+                <div key={idx}>{line}</div>
               ))}
-            </ul>
-            <div
-              style={{
-                position: "absolute",
-                bottom: "1rem",
-                left: "10%",
-                width: "80%",
-                height: "3px",
-                background: "linear-gradient(90deg, #a0c4ff, #bdb2ff)",
-                borderRadius: "1px",
-              }}
-            />
+            </div>
           </div>
         </div>
       </div>
@@ -228,7 +189,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   }
 
   return (
-    <div className="space-y-8 bg-[#f5f3f0] p-8 min-h-screen">
+    <div className="space-y-8 bg-[#e0e0e0] p-8 min-h-screen">
       <Button
         onClick={() => setShowForm(!showForm)}
         className="bg-yellow-500 hover:bg-yellow-600 text-white"
