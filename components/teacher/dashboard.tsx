@@ -123,7 +123,6 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50">
-      {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -141,12 +140,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                 Giáo Viên
               </Badge>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="flex items-center gap-2 bg-transparent"
-            >
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2 bg-transparent">
               <LogOut className="w-4 h-4" />
               Đăng Xuất
             </Button>
@@ -155,7 +149,6 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
             <CardContent className="p-6 flex items-center justify-between">
@@ -198,7 +191,6 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
           </Card>
         </div>
 
-        {/* Quick Actions */}
         <div className="mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
             <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -217,47 +209,41 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
           </Card>
         </div>
 
-        {/* Create Flashcard Form */}
         {showCreateFlashcardForm && (
           <div className="mb-8">
             <CreateFlashcardForm onSuccess={handleFlashcardCreated} />
           </div>
         )}
 
-        {/* Main Content Tabs */}
         <Tabs defaultValue="flashcards" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
-            <TabsTrigger value="flashcards" className="flex items-center gap-2"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
-            <TabsTrigger value="quizzes" className="flex items-center gap-2"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
-            <TabsTrigger value="students" className="flex items-center gap-2"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
-            <TabsTrigger value="classes" className="flex items-center gap-2"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
+            <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
+            <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
+            <TabsTrigger value="students"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
+            <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
+            <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
-          {/* Flashcards Tab */}
-          <TabsContent value="flashcards" className="space-y-6">
-            <div className="flex items-center justify-between">
+          <TabsContent value="flashcards">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Thẻ Học Của Tôi</h2>
               <Button
                 onClick={() => setShowCreateFlashcardForm(!showCreateFlashcardForm)}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
               >
-                <Plus className="w-4 h-4" />
-                Tạo Mới
+                <Plus className="w-4 h-4" /> Tạo Mới
               </Button>
             </div>
             <TeacherFlashcards flashcards={flashcards} onFlashcardsChange={loadDashboardData} />
           </TabsContent>
 
-          {/* Quizzes Tab */}
-          <TabsContent value="quizzes" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Bài Kiểm Tra Của Tôi</h2>
+          <TabsContent value="quizzes">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Bài Kiểm Tra Của Tôi</h2>
             <TeacherQuizzes quizzes={quizzes} onQuizzesChange={loadDashboardData} />
           </TabsContent>
 
-          {/* Students Tab */}
-          <TabsContent value="students" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Tổng Quan Học Sinh</h2>
+          <TabsContent value="students">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Tổng Quan Học Sinh</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {students.map((student) => (
                 <Card key={student.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
@@ -282,15 +268,13 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             </div>
           </TabsContent>
 
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">Phân Tích Học Tập</h2>
+          <TabsContent value="analytics">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Phân Tích Học Tập</h2>
             <TeacherAnalytics results={results} students={students} quizzes={quizzes} />
           </TabsContent>
 
-          {/* Classes Tab */}
-          <TabsContent value="classes" className="space-y-6">
-            <div className="flex items-center justify-between">
+          <TabsContent value="classes">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Lớp Học Của Tôi</h2>
               <Button
                 onClick={() => setShowCreateClassForm(!showCreateClassForm)}
@@ -300,9 +284,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
               </Button>
             </div>
 
-            {showCreateClassForm && (
-              <CreateClassForm onSuccess={handleClassCreated} />
-            )}
+            {showCreateClassForm && <CreateClassForm onSuccess={handleClassCreated} />}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classes.map((cls) => (
@@ -311,10 +293,18 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                     <CardTitle>{cls.name}</CardTitle>
                     <CardDescription>{cls.description}</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <div className="text-sm text-gray-600">
-                      Thời gian tạo: {new Date(cls.created_at).toLocaleDateString()}
+                      Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
                     </div>
+
+                    {/* ⭐ NÚT XEM CHI TIẾT */}
+                    <Button
+                      onClick={() => router.push(`/teacher/classes/${cls.id}`)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Xem Chi Tiết
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
