@@ -23,13 +23,12 @@ interface TeacherQuizzesProps {
 }
 
 export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps) {
-  const supabase = createClient() // tạo client Supabase
+  const supabase = createClient()
   const [selectedQuiz, setSelectedQuiz] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
-  // Xóa quiz và các câu hỏi liên quan
   const handleDeleteQuiz = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this quiz and all its questions?")) return
+    if (!confirm("Are you sure you want to delete this quiz and all its related data?")) return
     setIsDeleting(id)
 
     try {
@@ -39,7 +38,15 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
       if (!user) throw new Error("User not authenticated")
       if (userError) throw userError
 
-      // Xóa tất cả câu hỏi của quiz này (chỉ xóa câu hỏi do user tạo)
+      // 1️⃣ Xóa tất cả kết quả (results) liên quan đến quiz này
+      const { error: delResultsError } = await supabase
+        .from("results")
+        .delete()
+        .eq("quiz_id", id)
+        .eq("created_by", user.id) // chỉ xóa kết quả do user tạo (nếu cần)
+      if (delResultsError) throw delResultsError
+
+      // 2️⃣ Xóa tất cả câu hỏi liên quan (quiz_questions)
       const { error: delQuestionsError } = await supabase
         .from("quiz_questions")
         .delete()
@@ -47,7 +54,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         .eq("created_by", user.id)
       if (delQuestionsError) throw delQuestionsError
 
-      // Xóa quiz (chỉ xóa quiz do user tạo)
+      // 3️⃣ Xóa quiz
       const { error: delQuizError } = await supabase
         .from("quizzes")
         .delete()
@@ -56,7 +63,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
       if (delQuizError) throw delQuizError
 
       onQuizzesChange()
-      alert("Quiz deleted successfully!")
+      alert("Quiz and all related data deleted successfully!")
     } catch (err: any) {
       console.error("Delete quiz error:", err)
       alert("Failed to delete quiz: " + err.message)
