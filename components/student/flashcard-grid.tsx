@@ -189,7 +189,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   }
 
   return (
-    <div className="space-y-8 bg-[#e0e0e0] p-8 min-h-screen">
+    <div className="space-y-8 bg-[#fef6e4] p-8 min-h-screen">
       <Button
         onClick={() => setShowForm(!showForm)}
         className="bg-yellow-500 hover:bg-yellow-600 text-white"
