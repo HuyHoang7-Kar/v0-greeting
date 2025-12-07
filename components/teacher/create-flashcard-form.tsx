@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,8 +19,43 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
   const [answer, setAnswer] = useState("")
   const [category, setCategory] = useState("")
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium")
+  const [selectedClass, setSelectedClass] = useState<string | null>(null)
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) return
+
+        // Lấy các lớp mà user là giáo viên (role = 'teacher')
+        const { data: cls, error } = await supabase
+          .from("class_members")
+          .select("class_id, classes(name)")
+          .eq("user_id", user.id)
+          .eq("role", "teacher")
+          .innerJoin("classes", "classes.id", "class_members.class_id") // join để lấy tên lớp nếu cần
+        if (error) console.error("fetchClasses error:", error)
+
+        if (cls) {
+          const mapped = cls.map((c: any) => ({ id: c.class_id, name: c.classes?.name || "Unnamed Class" }))
+          setClasses(mapped)
+          if (mapped.length > 0) setSelectedClass(mapped[0].id)
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    fetchClasses()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,58 +63,38 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
     setError(null)
 
     try {
-      const supabase = createClient()
-
-      // Lấy user hiện tại từ session
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser()
 
-      if (userError) {
-        console.error("getUser error:", userError)
-        throw new Error(userError.message ?? "Could not get user")
-      }
-      if (!user) {
-        throw new Error("You must be logged in to create flashcards")
-      }
+      if (userError) throw new Error(userError.message || "Cannot get user")
+      if (!user) throw new Error("You must be logged in to create flashcards")
 
       const payload = {
         question: question.trim(),
         answer: answer.trim(),
         category: category.trim() || null,
         difficulty,
-        created_by: user.id, // <-- gửi cột này (phù hợp DB hiện tại)
+        created_by: user.id,
+        class_id: selectedClass, // <-- gắn flashcard vào lớp nếu có
       }
 
-      console.debug("Creating flashcard payload:", payload)
+      const { data: inserted, error: insertError } = await supabase.from("flashcards").insert(payload).select()
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("flashcards")
-        .insert(payload)
-        .select() // trả về record đã chèn
-
-      if (insertError) {
-        // Log chi tiết để bạn thấy trong console (Network cũng có response)
-        console.error("Insert flashcard error (raw):", insertError)
-        // normalize to Error để catch có message
-        throw new Error(insertError.message ?? JSON.stringify(insertError))
-      }
-
-      console.log("Inserted flashcard:", inserted)
+      if (insertError) throw new Error(insertError.message || JSON.stringify(insertError))
 
       // Reset form
       setQuestion("")
       setAnswer("")
       setCategory("")
       setDifficulty("medium")
+      if (classes.length > 0) setSelectedClass(classes[0].id)
 
       onSuccess?.()
     } catch (err: unknown) {
-      console.error("Create flashcard failed:", err)
-      const msg =
-        err instanceof Error ? err.message : JSON.stringify(err, Object.getOwnPropertyNames(err))
-      setError(msg || "An error occurred")
+      const msg = err instanceof Error ? err.message : JSON.stringify(err)
+      setError(msg)
     } finally {
       setIsLoading(false)
     }
@@ -152,6 +167,26 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
               </Select>
             </div>
           </div>
+
+          {classes.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="class" className="text-sm font-medium text-gray-700">
+                Assign to Class
+              </Label>
+              <Select value={selectedClass || ""} onValueChange={(val) => setSelectedClass(val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
