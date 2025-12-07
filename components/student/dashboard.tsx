@@ -15,7 +15,7 @@ import { GameHub } from "@/components/games/game-hub"
 import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-// ✅ JoinClass component inline (theo schema mới)
+// ✅ JoinClass component inline
 interface Class {
   id: string
   name: string
@@ -118,7 +118,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const loadDashboardData = async () => {
     try {
       setIsLoading(true)
-
       const { data: flashcardsData } = await supabase.from("flashcards").select("*").order("created_at", { ascending: false })
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
       const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
@@ -240,13 +239,13 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="flashcards"><FlashcardGrid flashcards={flashcards} /></TabsContent>
+          <TabsContent value="flashcards">
+            <StudentFlashcards userId={user.id} />
+          </TabsContent>
           <TabsContent value="games"><GameHub /></TabsContent>
           <TabsContent value="quizzes"><StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} /></TabsContent>
           <TabsContent value="notes"><StudentNotes notes={notes} onNotesChange={loadDashboardData} /></TabsContent>
           <TabsContent value="progress"><StudentProgress results={results} quizzes={quizzes} /></TabsContent>
-
-          {/* ✅ Classes tab */}
           <TabsContent value="classes" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
             <JoinClass supabase={supabase} userId={user.id} />
