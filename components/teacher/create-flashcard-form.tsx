@@ -14,37 +14,41 @@ interface CreateFlashcardFormProps {
   onSuccess?: () => void
 }
 
+interface ClassOption {
+  id: string
+  name: string
+}
+
 export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
-  const supabase = createClient()
-  
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [category, setCategory] = useState("")
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium")
-  const [classId, setClassId] = useState<string | null>(null)
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
+  const [selectedClass, setSelectedClass] = useState<string>("")
+  const [classes, setClasses] = useState<ClassOption[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Lấy danh sách lớp mà giáo viên tạo
+  const supabase = createClient()
+
+  // Load classes created by this teacher
   useEffect(() => {
     const fetchClasses = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError) throw userError
+        const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
         const { data, error } = await supabase
           .from("classes")
           .select("id, name")
-          .eq("created_by", user.id)  // chỉ lấy lớp do giáo viên tạo
-        
-        if (error) throw error
+          .eq("teacher_id", user.id) // dùng teacher_id
+          .order("name")
 
+        if (error) throw error
         setClasses(data || [])
-        if ((data || []).length > 0) setClassId(data![0].id)
       } catch (err: any) {
         console.error("Error fetching classes:", err)
+        setError(err.message || JSON.stringify(err))
       }
     }
     fetchClasses()
@@ -52,29 +56,28 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!selectedClass) {
+      setError("Bạn phải chọn lớp")
+      return
+    }
     setIsLoading(true)
     setError(null)
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError) throw userError
-      if (!user) throw new Error("You must be logged in to create flashcards")
-      if (!classId) throw new Error("Please select a class")
+      if (!user) throw new Error("Bạn phải đăng nhập")
 
       const payload = {
         question: question.trim(),
         answer: answer.trim(),
         category: category.trim() || null,
         difficulty,
-        class_id: classId,
+        class_id: selectedClass,
         created_by: user.id,
       }
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("flashcards")
-        .insert(payload)
-        .select()
-      
+      const { error: insertError } = await supabase.from("flashcards").insert(payload)
       if (insertError) throw insertError
 
       // Reset form
@@ -82,8 +85,7 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
       setAnswer("")
       setCategory("")
       setDifficulty("medium")
-      setClassId(classes.length > 0 ? classes[0].id : null)
-
+      setSelectedClass("")
       onSuccess?.()
     } catch (err: any) {
       console.error("Create flashcard failed:", err)
@@ -97,17 +99,16 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
     <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-gray-900">
-          <Plus className="w-5 h-5" />
-          Create New Flashcard
+          <Plus className="w-5 h-5" /> Create New Flashcard
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="question" className="text-sm font-medium text-gray-700">Question *</Label>
+            <Label htmlFor="question">Question *</Label>
             <Textarea
               id="question"
-              placeholder="Enter your question here..."
+              placeholder="Enter your question..."
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               required
@@ -116,10 +117,10 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="answer" className="text-sm font-medium text-gray-700">Answer *</Label>
+            <Label htmlFor="answer">Answer *</Label>
             <Textarea
               id="answer"
-              placeholder="Enter the answer here..."
+              placeholder="Enter the answer..."
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               required
@@ -129,7 +130,7 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category" className="text-sm font-medium text-gray-700">Category (Optional)</Label>
+              <Label htmlFor="category">Category (Optional)</Label>
               <Input
                 id="category"
                 placeholder="e.g., Mathematics, History"
@@ -139,7 +140,26 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="difficulty" className="text-sm font-medium text-gray-700">Difficulty</Label>
+              <Label htmlFor="class">Class *</Label>
+              <Select
+                value={selectedClass}
+                onValueChange={(v) => setSelectedClass(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="difficulty">Difficulty</Label>
               <Select value={difficulty} onValueChange={(value: "easy" | "medium" | "hard") => setDifficulty(value)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -153,31 +173,13 @@ export function CreateFlashcardForm({ onSuccess }: CreateFlashcardFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2 mt-2">
-            <Label htmlFor="class" className="text-sm font-medium text-gray-700">Class *</Label>
-            {classes.length === 0 ? (
-              <div className="p-2 text-sm text-gray-500">You have not created any classes yet</div>
-            ) : (
-              <Select value={classId || ""} onValueChange={(v) => setClassId(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
+          )}
 
           <Button
             type="submit"
-            disabled={isLoading || !question.trim() || !answer.trim() || !classId}
+            disabled={isLoading || !question.trim() || !answer.trim()}
             className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
           >
             {isLoading ? (
