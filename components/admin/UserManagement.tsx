@@ -11,7 +11,7 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
-  const supabase = createClient()
+  const supabase = createClient() // browser client
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,6 +19,7 @@ export default function UserManagement() {
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
+  // Lấy danh sách user
   const fetchUsers = async () => {
     setLoading(true)
     try {
@@ -37,6 +38,7 @@ export default function UserManagement() {
     fetchUsers()
   }, [])
 
+  // Thêm user
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
 
@@ -54,7 +56,7 @@ export default function UserManagement() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      alert(`Thêm user thành công!\nMật khẩu tạm thời: ${data.tempPassword}`)
+      alert("User tạo thành công! Mật khẩu tạm thời: " + data.tempPassword)
 
       setNewEmail("")
       setNewFullName("")
@@ -65,6 +67,7 @@ export default function UserManagement() {
     }
   }
 
+  // Xóa user
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
@@ -81,6 +84,7 @@ export default function UserManagement() {
     }
   }
 
+  // Cập nhật role
   const handleUpdateRole = async (id: string, role: string) => {
     try {
       const res = await fetch("/api/admin/manage-user", {
@@ -102,6 +106,7 @@ export default function UserManagement() {
     <div>
       <h2 className="text-lg font-semibold mb-4">Danh sách người dùng</h2>
 
+      {/* Form thêm user mới */}
       <div className="mb-6 flex gap-2">
         <input
           type="email"
@@ -134,6 +139,7 @@ export default function UserManagement() {
         </button>
       </div>
 
+      {/* Bảng user */}
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100">

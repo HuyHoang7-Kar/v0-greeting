@@ -8,28 +8,27 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "create") {
-      // Kiểm tra email đã tồn tại
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", email)
-        .single()
-
-      if (existingProfile)
-        return NextResponse.json(
-          { error: "Email này đã tồn tại" },
-          { status: 400 }
-        )
-
       const tempPassword = Math.random().toString(36).slice(-8)
 
-      // Tạo user trong Supabase Auth
+      // Tạo user Auth + gửi invite email
       const { data, error } = await supabase.auth.admin.createUser({
         email,
         password: tempPassword,
-        email_confirm: true, // gửi email xác nhận
+        email_confirm: false,
+        invite_email: true
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      // Kiểm tra user trong profiles đã tồn tại chưa
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", data.user.id)
+        .single()
+        .catch(() => null)
+
+      if (existingProfile)
+        return NextResponse.json({ error: "User đã tồn tại trong profiles" }, { status: 400 })
 
       // Insert vào profiles
       const { error: profileError } = await supabase.from("profiles").insert({
@@ -38,8 +37,11 @@ export async function POST(req: NextRequest) {
         full_name,
         role,
       })
-      if (profileError)
+      if (profileError) {
+        // rollback Auth user
+        await supabase.auth.admin.deleteUser(data.user.id)
         return NextResponse.json({ error: profileError.message }, { status: 500 })
+      }
 
       return NextResponse.json({ success: true, tempPassword })
     }
