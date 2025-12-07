@@ -12,6 +12,7 @@ import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
+import JoinClass from "@/components/student/join-class"
 import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -91,15 +92,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
-  }
-
-  const handleJoinClass = async (classId: string) => {
-    try {
-      await supabase.from("class_students").insert({ class_id: classId, student_id: user.id })
-      setMyClasses([...myClasses, classId])
-    } catch (error) {
-      console.error("❌ Lỗi tham gia lớp:", error)
-    }
   }
 
   if (isLoading) {
@@ -200,7 +192,11 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
 
           {/* Classes Tab */}
           <TabsContent value="classes" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Tham Gia Lớp</h2>
+
+            <JoinClass userId={user.id} onJoined={(id) => setMyClasses([...myClasses, id])} />
+
+            <h2 className="text-2xl font-bold text-gray-900 mt-6 mb-4">Các Lớp Có Sẵn</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classes.map((cls) => {
                 const joined = myClasses.includes(cls.id)
@@ -215,7 +211,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
                       {joined ? (
                         <Badge variant="secondary" className="bg-green-100 text-green-800">Đã tham gia</Badge>
                       ) : (
-                        <Button size="sm" onClick={() => handleJoinClass(cls.id)}>Tham Gia</Button>
+                        <Badge variant="secondary" className="bg-gray-100 text-gray-700">Chưa tham gia</Badge>
                       )}
                     </CardContent>
                   </Card>
