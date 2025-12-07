@@ -33,6 +33,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   // Form state
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -87,10 +88,6 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       setError("Câu hỏi và câu trả lời không được để trống")
       return
     }
-    if (joinedClassIds.length === 0) {
-      setError("Bạn chưa tham gia lớp nào")
-      return
-    }
 
     setIsSubmitting(true)
     setError(null)
@@ -98,7 +95,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       const payload = {
         question: question.trim(),
         answer: answer.trim(),
-        class_id: joinedClassIds[0],
+        class_id: selectedClassId || null, // null nếu flashcard riêng
         created_by: userId,
       }
 
@@ -112,6 +109,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       setFlashcards((prev) => [...data, ...prev])
       setQuestion("")
       setAnswer("")
+      setSelectedClassId(null)
       setShowForm(false)
     } catch (err: any) {
       console.error(err)
@@ -123,18 +121,17 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
-  // Component flashcard với hiệu ứng lật và màu gradient
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
 
     const colors = [
-      "from-pink-100 to-pink-200",
+      "from-red-100 to-red-200",
       "from-blue-100 to-blue-200",
       "from-green-100 to-green-200",
       "from-yellow-100 to-yellow-200",
       "from-purple-100 to-purple-200",
+      "from-pink-100 to-pink-200",
       "from-indigo-100 to-indigo-200",
-      "from-rose-100 to-rose-200",
     ]
     const colorIndex =
       Math.abs(flashcard.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) %
@@ -152,16 +149,16 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           }`}
         >
           {/* Front */}
-          <Card className={`absolute inset-0 w-full h-full backface-hidden bg-white shadow-lg rounded-lg`}>
+          <Card className="absolute inset-0 w-full h-full backface-hidden rounded-xl shadow-2xl bg-white">
             <CardContent className={`flex items-center justify-center h-full p-4 bg-gradient-to-br ${gradient}`}>
-              <p className="text-center font-medium text-gray-900">{flashcard.question}</p>
+              <p className="text-center font-bold text-lg">{flashcard.question}</p>
             </CardContent>
           </Card>
 
           {/* Back */}
-          <Card className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 bg-white shadow-lg rounded-lg`}>
+          <Card className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-2xl bg-white">
             <CardContent className={`flex items-center justify-center h-full p-4 bg-gradient-to-br ${gradient}`}>
-              <p className="text-center text-gray-700">{flashcard.answer}</p>
+              <p className="text-center text-gray-800">{flashcard.answer}</p>
             </CardContent>
           </Card>
         </div>
@@ -171,15 +168,17 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   return (
     <div className="space-y-8">
-      {/* Nút hiển thị form tạo flashcard */}
-      <Button onClick={() => setShowForm(!showForm)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
+      <Button
+        onClick={() => setShowForm(!showForm)}
+        className="bg-yellow-500 hover:bg-yellow-600 text-white"
+      >
         {showForm ? "Đóng tạo Flashcard" : "Tạo Flashcard mới"}
       </Button>
 
       {showForm && (
         <Card className="border-2 border-yellow-200 bg-yellow-50">
           <CardHeader>
-            <CardTitle>Tạo Flashcard của bạn</CardTitle>
+            <CardTitle>Tạo Flashcard</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateFlashcard} className="space-y-4">
@@ -205,6 +204,24 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                 />
               </div>
 
+              {joinedClassIds.length > 0 && (
+                <div className="space-y-2">
+                  <label className="block font-medium">Chọn Lớp (tùy chọn)</label>
+                  <select
+                    value={selectedClassId || ""}
+                    onChange={(e) => setSelectedClassId(e.target.value || null)}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Flashcard riêng</option>
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {error && <p className="text-red-600">{error}</p>}
 
               <Button
@@ -219,7 +236,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         </Card>
       )}
 
-      {/* Hiển thị flashcards theo lớp */}
+      {/* Flashcards theo lớp */}
       {classes.map((cls) => {
         const flashcardsOfClass = flashcards.filter((f) => f.class_id === cls.id)
         if (flashcardsOfClass.length === 0) return null
@@ -234,6 +251,20 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           </div>
         )
       })}
+
+      {/* Flashcards riêng tư của học sinh */}
+      {flashcards.filter((f) => f.created_by === userId && !f.class_id).length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold mb-4">Flashcards riêng của bạn</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {flashcards
+              .filter((f) => f.created_by === userId && !f.class_id)
+              .map((f) => (
+                <FlashcardItem key={f.id} flashcard={f} />
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
