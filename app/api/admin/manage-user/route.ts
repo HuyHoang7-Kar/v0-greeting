@@ -1,4 +1,3 @@
-// route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseServer } from "@/lib/supabase/server-client"
 
@@ -9,29 +8,30 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "create") {
-      // Kiểm tra email đã tồn tại trong profiles chưa
-      const { data: existing } = await supabase
+      // Kiểm tra email đã tồn tại
+      const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
         .eq("email", email)
         .single()
-      
-      if (existing)
-        return NextResponse.json({ error: "Email này đã tồn tại" }, { status: 400 })
 
-      // Tạo mật khẩu tạm thời
+      if (existingProfile)
+        return NextResponse.json(
+          { error: "Email này đã tồn tại" },
+          { status: 400 }
+        )
+
       const tempPassword = Math.random().toString(36).slice(-8)
 
-      // Tạo user trong auth (gửi email xác nhận)
+      // Tạo user trong Supabase Auth
       const { data, error } = await supabase.auth.admin.createUser({
         email,
         password: tempPassword,
         email_confirm: true, // gửi email xác nhận
       })
-      if (error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-      // Thêm thông tin user vào profiles
+      // Insert vào profiles
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         email,
@@ -41,8 +41,7 @@ export async function POST(req: NextRequest) {
       if (profileError)
         return NextResponse.json({ error: profileError.message }, { status: 500 })
 
-      // Trả về mật khẩu tạm thời cho client hiển thị
-      return NextResponse.json({ success: true, password: tempPassword })
+      return NextResponse.json({ success: true, tempPassword })
     }
 
     if (action === "delete") {
@@ -52,15 +51,11 @@ export async function POST(req: NextRequest) {
       await supabase.from("game_scores").delete().eq("user_id", id)
       await supabase.from("notes").delete().eq("user_id", id)
 
-      // Xóa profile
       const { error: profileError } = await supabase.from("profiles").delete().eq("id", id)
-      if (profileError)
-        return NextResponse.json({ error: profileError.message }, { status: 500 })
+      if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
 
-      // Xóa user trong auth
       const { error: authError } = await supabase.auth.admin.deleteUser(id)
-      if (authError)
-        return NextResponse.json({ error: authError.message }, { status: 500 })
+      if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
 
       return NextResponse.json({ success: true })
     }
