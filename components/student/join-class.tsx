@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -15,34 +15,25 @@ export default function JoinClass({ userId, onJoined }: JoinClassProps) {
   const [classId, setClassId] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
-  const supabase = createClient()
 
   const handleJoin = async () => {
-    if (!classId.trim()) {
-      setMessage("Vui lòng nhập ID lớp!")
-      return
-    }
-
+    if (!classId) return setMessage("Vui lòng nhập ID lớp!")
     setLoading(true)
     setMessage("")
 
-    try {
-      const { data, error } = await supabase
-        .from("class_students")
-        .insert([{ class_id: classId.trim(), student_id: userId }])
+    const { data, error } = await supabase
+      .from("class_members")
+      .insert([{ class_id: classId, user_id: userId, role: "student" }])
 
-      if (error) {
-        setMessage(`❌ Lỗi: ${error.message}`)
-      } else {
-        setMessage("✅ Tham gia lớp thành công!")
-        onJoined && onJoined(classId.trim())
-        setClassId("")
-      }
-    } catch (err: any) {
-      setMessage(`❌ Lỗi: ${err.message || err}`)
-    } finally {
-      setLoading(false)
+    if (error) {
+      setMessage(`❌ Lỗi: ${error.message}`)
+    } else {
+      setMessage("✅ Tham gia lớp thành công!")
+      onJoined && onJoined(classId)
+      setClassId("")
     }
+
+    setLoading(false)
   }
 
   return (
@@ -58,10 +49,7 @@ export default function JoinClass({ userId, onJoined }: JoinClassProps) {
         </Button>
       </div>
       {message && (
-        <Badge
-          variant={message.startsWith("✅") ? "secondary" : "destructive"}
-          className="mt-1"
-        >
+        <Badge variant={message.startsWith("✅") ? "secondary" : "destructive"} className="mt-1">
           {message}
         </Badge>
       )}

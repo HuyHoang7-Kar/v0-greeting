@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,6 +12,7 @@ import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
+import JoinClass from "@/components/student/join-class"
 import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -38,13 +39,11 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [classes, setClasses] = useState<Class[]>([])
-  const [myClasses, setMyClasses] = useState<string[]>([]) // IDs của lớp đã tham gia
+  const [myClasses, setMyClasses] = useState<string[]>([]) // IDs lớp đã tham gia
   const [userPoints, setUserPoints] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
-
-  const supabase = createClient()
 
   useEffect(() => {
     loadDashboardData()
@@ -57,16 +56,10 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
       const { data: flashcardsData } = await supabase.from("flashcards").select("*").order("created_at", { ascending: false })
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
       const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("updated_at", { ascending: false })
-      const { data: resultsData } = await supabase
-        .from("results")
-        .select(`*, quizzes(title)`)
-        .eq("user_id", user.id)
-        .order("completed_at", { ascending: false })
+      const { data: resultsData } = await supabase.from("results").select(`*, quizzes(title)`).eq("user_id", user.id).order("completed_at", { ascending: false })
       const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
 
-      // Lấy danh sách lớp
       const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
-      // Lấy lớp mà học sinh đã tham gia
       const { data: myClassesData } = await supabase.from("class_students").select("class_id").eq("student_id", user.id)
 
       setFlashcards(flashcardsData || [])
@@ -91,15 +84,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
-  }
-
-  const handleJoinClass = async (classId: string) => {
-    try {
-      await supabase.from("class_students").insert({ class_id: classId, student_id: user.id })
-      setMyClasses([...myClasses, classId])
-    } catch (error) {
-      console.error("❌ Lỗi tham gia lớp:", error)
-    }
   }
 
   if (isLoading) {
@@ -191,7 +175,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
-          {/* Flashcards Tab */}
           <TabsContent value="flashcards"><FlashcardGrid flashcards={flashcards} /></TabsContent>
           <TabsContent value="games"><GameHub /></TabsContent>
           <TabsContent value="quizzes"><StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} /></TabsContent>
@@ -200,7 +183,10 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
 
           {/* Classes Tab */}
           <TabsContent value="classes" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Tham Gia Lớp</h2>
+            <JoinClass userId={user.id} onJoined={(id) => setMyClasses([...myClasses, id])} />
+
+            <h2 className="text-2xl font-bold text-gray-900 mt-6 mb-4">Các Lớp Có Sẵn</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classes.map((cls) => {
                 const joined = myClasses.includes(cls.id)
@@ -215,7 +201,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
                       {joined ? (
                         <Badge variant="secondary" className="bg-green-100 text-green-800">Đã tham gia</Badge>
                       ) : (
-                        <Button size="sm" onClick={() => handleJoinClass(cls.id)}>Tham Gia</Button>
+                        <Badge variant="secondary" className="bg-gray-100 text-gray-700">Chưa tham gia</Badge>
                       )}
                     </CardContent>
                   </Card>
