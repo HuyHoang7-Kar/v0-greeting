@@ -44,35 +44,40 @@ export default function ClassDetailsDashboard({ cls, onClose }: Props) {
 
       if (membersError) console.error("membersError", membersError)
 
-      // 2) class_scores join game
+      const memberIds = (classMembers || []).map((m: any) => m.user_id).filter(Boolean)
+      setMembers(classMembers || [])
+
+      // 2) results: chỉ lấy quiz do học sinh trong lớp làm
+      let resultsData: any[] = []
+      if (memberIds.length > 0) {
+        const { data: res, error: resErr } = await supabase
+          .from("results")
+          .select("id, user_id, quiz_id, score, total_questions, completed_at, quizzes(id, title, class_id)")
+          .in("user_id", memberIds)
+          .order("completed_at", { ascending: false })
+
+        if (resErr) console.error("resultsError", resErr)
+        // Lọc chỉ quiz thuộc lớp hiện tại
+        resultsData = (res || []).filter(r => r.quizzes?.class_id === cls.id)
+      }
+
+      setResults(resultsData)
+
+      // 3) class_scores: chỉ giữ scores cho học sinh trong lớp
       const { data: scoresData, error: scoresError } = await supabase
         .from("class_scores")
         .select("class_id, game_id, total_score, max_score, avg_score, updated_at, game(id, title, thumbnail_url, category)")
         .eq("class_id", cls.id)
 
       if (scoresError) console.error("scoresError", scoresError)
-
-      // 3) results for users in this class
-      const userIds = (classMembers || []).map((m: any) => m.user_id).filter(Boolean)
-      let resultsData: any[] = []
-      if (userIds.length > 0) {
-        const res = await supabase
-          .from("results")
-          .select("id, user_id, quiz_id, score, total_questions, completed_at, quizzes(id, title)")
-          .in("user_id", userIds)
-          .order("completed_at", { ascending: false })
-        resultsData = res.data || []
-      }
-
-      setMembers(classMembers || [])
       setClassScores(scoresData || [])
-      setResults(resultsData || [])
 
-      // aggregate simple stats
-      const totalPlays = (resultsData || []).length
+      // 4) aggregate stats
+      const totalPlays = resultsData.length
       const avgScore =
-        totalPlays > 0 ? Math.round(((resultsData as any[]).reduce((s, r) => s + (r.score || 0), 0) / totalPlays) * 100) / 100 : 0
+        totalPlays > 0 ? Math.round(resultsData.reduce((s, r) => s + (r.score || 0), 0) / totalPlays * 100) / 100 : 0
       setAgg({ totalPlays, avgScore })
+
     } catch (err) {
       console.error("Error loading class details", err)
     } finally {
