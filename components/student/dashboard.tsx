@@ -15,6 +15,81 @@ import { GameHub } from "@/components/games/game-hub"
 import { BookOpen, Brain, FileText, TrendingUp, LogOut, User, Gamepad2, Trophy, Medal, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 
+// ✅ JoinClass component inline (theo schema mới)
+interface Class {
+  id: string
+  name: string
+  description?: string
+  teacher_id: string
+  created_at: string
+}
+
+interface JoinClassProps {
+  supabase: any
+  userId: string
+}
+
+function JoinClass({ supabase, userId }: JoinClassProps) {
+  const [classes, setClasses] = useState<Class[]>([])
+  const [joinedClasses, setJoinedClasses] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadClasses()
+  }, [])
+
+  const loadClasses = async () => {
+    setLoading(true)
+    try {
+      const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
+      const { data: joinedData } = await supabase.from("class_members").select("class_id").eq("user_id", userId)
+
+      setClasses(classesData || [])
+      setJoinedClasses(joinedData?.map((c) => c.class_id) || [])
+    } catch (error) {
+      console.error("❌ Lỗi load classes:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJoin = async (classId: string) => {
+    try {
+      await supabase.from("class_members").insert({ class_id: classId, user_id: userId, role: "student" })
+      setJoinedClasses([...joinedClasses, classId])
+    } catch (error) {
+      console.error("❌ Lỗi tham gia lớp:", error)
+    }
+  }
+
+  if (loading) return <p>Đang tải lớp học...</p>
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {classes.map((cls) => {
+        const joined = joinedClasses.includes(cls.id)
+        return (
+          <Card key={cls.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle>{cls.name}</CardTitle>
+              <CardDescription>{cls.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}</span>
+              {joined ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-800">Đã tham gia</Badge>
+              ) : (
+                <Button size="sm" onClick={() => handleJoin(cls.id)}>Tham Gia</Button>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
+// ✅ StudentDashboard
 interface Profile {
   id: string
   email: string
@@ -24,27 +99,17 @@ interface Profile {
   bio?: string
 }
 
-interface Class {
-  id: string
-  name: string
-  description?: string
-  teacher_id: string
-  created_at: string
-}
-
 export function StudentDashboard({ user, profile }: { user: any; profile: Profile }) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
-  const [classes, setClasses] = useState<Class[]>([])
-  const [myClasses, setMyClasses] = useState<string[]>([])
   const [userPoints, setUserPoints] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
 
-  const supabase = createClient() // dùng client giống teacher
+  const supabase = createClient()
 
   useEffect(() => {
     loadDashboardData()
@@ -56,7 +121,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
 
       const { data: flashcardsData } = await supabase.from("flashcards").select("*").order("created_at", { ascending: false })
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
-      const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("updated_at", { ascending: false })
+      const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
       const { data: resultsData } = await supabase
         .from("results")
         .select(`*, quizzes(title)`)
@@ -64,16 +129,11 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
         .order("completed_at", { ascending: false })
       const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
 
-      const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
-      const { data: myClassesData } = await supabase.from("class_students").select("class_id").eq("student_id", user.id)
-
       setFlashcards(flashcardsData || [])
       setQuizzes(quizzesData || [])
       setNotes(notesData || [])
       setResults(resultsData || [])
       setUserPoints(pointsData)
-      setClasses(classesData || [])
-      setMyClasses(myClassesData?.map((c) => c.class_id) || [])
     } catch (error) {
       console.error("❌ Lỗi load dashboard:", error)
     } finally {
@@ -89,15 +149,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const handleStudyComplete = () => {
     loadDashboardData()
     setStudyMode(false)
-  }
-
-  const handleJoinClass = async (classId: string) => {
-    try {
-      await supabase.from("class_students").insert({ class_id: classId, student_id: user.id })
-      setMyClasses([...myClasses, classId])
-    } catch (error) {
-      console.error("❌ Lỗi tham gia lớp:", error)
-    }
   }
 
   if (isLoading) {
@@ -195,29 +246,10 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
           <TabsContent value="notes"><StudentNotes notes={notes} onNotesChange={loadDashboardData} /></TabsContent>
           <TabsContent value="progress"><StudentProgress results={results} quizzes={quizzes} /></TabsContent>
 
+          {/* ✅ Classes tab */}
           <TabsContent value="classes" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {classes.map((cls) => {
-                const joined = myClasses.includes(cls.id)
-                return (
-                  <Card key={cls.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle>{cls.name}</CardTitle>
-                      <CardDescription>{cls.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}</span>
-                      {joined ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Đã tham gia</Badge>
-                      ) : (
-                        <Button size="sm" onClick={() => handleJoinClass(cls.id)}>Tham Gia</Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
+            <JoinClass supabase={supabase} userId={user.id} />
           </TabsContent>
         </Tabs>
       </div>
