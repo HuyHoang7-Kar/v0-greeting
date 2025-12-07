@@ -9,7 +9,7 @@ interface Flashcard {
   id: string
   question: string
   answer: string
-  class_id: string
+  class_id: string | null
   created_by: string
 }
 
@@ -37,10 +37,10 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    loadClassesAndFlashcards()
+    loadData()
   }, [])
 
-  const loadClassesAndFlashcards = async () => {
+  const loadData = async () => {
     setLoading(true)
     try {
       // Lấy các lớp học sinh đã tham gia
@@ -52,6 +52,12 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       const classIds = joinedData?.map((c) => c.class_id) || []
       setJoinedClassIds(classIds)
 
+      if (classIds.length === 0) {
+        setClasses([])
+        setFlashcards([])
+        return
+      }
+
       // Lấy thông tin lớp
       const { data: classesData } = await supabase
         .from("classes")
@@ -60,19 +66,18 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
       setClasses(classesData || [])
 
-      // Lấy flashcards: flashcard của lớp hoặc flashcard do chính học sinh tạo
+      // Lấy flashcards: flashcards của lớp hoặc flashcards do chính học sinh tạo
       const { data: flashcardsData } = await supabase
         .from("flashcards")
         .select("*")
         .or(
-          classIds.map((id) => `class_id.eq.${id}`).join(",") +
-          `,and(created_by.eq.${userId},class_id.is.null)`
+          [...classIds.map((id) => `class_id.eq.${id}`), `created_by.eq.${userId}`].join(",")
         )
         .order("created_at", { ascending: false })
 
       setFlashcards(flashcardsData || [])
     } catch (err) {
-      console.error("❌ Lỗi load lớp hoặc flashcards:", err)
+      console.error("❌ Lỗi load dữ liệu:", err)
     } finally {
       setLoading(false)
     }
@@ -106,7 +111,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
       if (insertError) throw insertError
 
-      setFlashcards([...(flashcards || []), ...data])
+      // Thêm flashcard mới lên đầu danh sách
+      setFlashcards((prev) => [...data, ...prev])
       setQuestion("")
       setAnswer("")
     } catch (err: any) {
@@ -170,7 +176,9 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
               {flashcardsOfClass.map((f) => (
                 <Card
                   key={f.id}
-                  className={`border-2 ${f.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"}`}
+                  className={`border-2 ${
+                    f.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"
+                  }`}
                 >
                   <CardContent>
                     <p className="font-medium mb-2">{f.question}</p>
