@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabase/client"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -16,24 +16,31 @@ export default function JoinClass({ userId, onJoined }: JoinClassProps) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
 
+  const supabase = createClientComponentClient()
+
   const handleJoin = async () => {
-    if (!classId) return setMessage("Vui lòng nhập ID lớp!")
+    if (!classId.trim()) return setMessage("Vui lòng nhập ID lớp!")
     setLoading(true)
     setMessage("")
 
-    const { data, error } = await supabase
-      .from("class_members")
-      .insert([{ class_id: classId, user_id: userId, role: "student" }])
+    try {
+      // Thêm học sinh vào class_members
+      const { data, error } = await supabase
+        .from("class_members")
+        .insert({ class_id: classId.trim(), user_id: userId, role: "student" })
 
-    if (error) {
-      setMessage(`❌ Lỗi: ${error.message}`)
-    } else {
-      setMessage("✅ Tham gia lớp thành công!")
-      onJoined && onJoined(classId)
-      setClassId("")
+      if (error) {
+        setMessage(`❌ Lỗi: ${error.message}`)
+      } else {
+        setMessage("✅ Tham gia lớp thành công!")
+        onJoined && onJoined(classId.trim())
+        setClassId("")
+      }
+    } catch (err: any) {
+      setMessage(`❌ Lỗi: ${err.message || "Không xác định"}`)
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
@@ -49,7 +56,10 @@ export default function JoinClass({ userId, onJoined }: JoinClassProps) {
         </Button>
       </div>
       {message && (
-        <Badge variant={message.startsWith("✅") ? "secondary" : "destructive"} className="mt-1">
+        <Badge
+          variant={message.startsWith("✅") ? "secondary" : "destructive"}
+          className="mt-1"
+        >
           {message}
         </Badge>
       )}

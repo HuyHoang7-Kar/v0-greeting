@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -39,11 +39,13 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [classes, setClasses] = useState<Class[]>([])
-  const [myClasses, setMyClasses] = useState<string[]>([]) // IDs lớp đã tham gia
+  const [myClasses, setMyClasses] = useState<string[]>([])
   const [userPoints, setUserPoints] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
+
+  const supabase = createClient()
 
   useEffect(() => {
     loadDashboardData()
@@ -56,10 +58,16 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
       const { data: flashcardsData } = await supabase.from("flashcards").select("*").order("created_at", { ascending: false })
       const { data: quizzesData } = await supabase.from("quizzes").select("*").order("created_at", { ascending: false })
       const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id).order("updated_at", { ascending: false })
-      const { data: resultsData } = await supabase.from("results").select(`*, quizzes(title)`).eq("user_id", user.id).order("completed_at", { ascending: false })
+      const { data: resultsData } = await supabase
+        .from("results")
+        .select(`*, quizzes(title)`)
+        .eq("user_id", user.id)
+        .order("completed_at", { ascending: false })
       const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
 
+      // Lấy danh sách lớp
       const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
+      // Lấy lớp mà học sinh đã tham gia
       const { data: myClassesData } = await supabase.from("class_students").select("class_id").eq("student_id", user.id)
 
       setFlashcards(flashcardsData || [])
@@ -175,6 +183,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
+          {/* Flashcards Tab */}
           <TabsContent value="flashcards"><FlashcardGrid flashcards={flashcards} /></TabsContent>
           <TabsContent value="games"><GameHub /></TabsContent>
           <TabsContent value="quizzes"><StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} /></TabsContent>
