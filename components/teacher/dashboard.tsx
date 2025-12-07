@@ -245,41 +245,6 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Bài Kiểm Tra Của Tôi</h2>
             <TeacherQuizzes quizzes={quizzes} onQuizzesChange={loadDashboardData} />
           </TabsContent>
-
-          {/* STUDENTS TAB */}
-          <TabsContent value="students">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Tổng Quan Học Sinh</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {students.map((student) => (
-                <Card key={student.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle>{student.full_name || student.email}</CardTitle>
-                    <CardDescription>{student.email}</CardDescription>
-                  </CardHeader>
-
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Tham gia:</span>
-                        <span className="text-gray-900">
-                          {new Date(student.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Lượt làm bài:</span>
-                        <span className="text-gray-900">
-                          {results.filter((r) => r.user_id === student.id).length}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
           {/* ANALYTICS TAB */}
           <TabsContent value="analytics">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Phân Tích Học Tập</h2>
