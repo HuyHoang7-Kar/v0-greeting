@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, BarChart3, X } from "lucide-react"
-import React from "react"
 
 interface ClassProps {
   id: string
@@ -20,62 +19,65 @@ interface Props {
 }
 
 export default function ClassDetailsDashboard({ cls, onClose }: Props) {
+  const supabase = createClient()
+
   const [members, setMembers] = useState<any[]>([])
-  const [scores, setScores] = useState<any[]>([])
+  const [classScores, setClassScores] = useState<any[]>([])
+  const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [aggStats, setAggStats] = useState<{ totalPlays: number; avgScore: number }>({ totalPlays: 0, avgScore: 0 })
+  const [agg, setAgg] = useState({ totalPlays: 0, avgScore: 0 })
 
   useEffect(() => {
+    if (!cls?.id) return
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cls?.id])
 
   const loadData = async () => {
     setLoading(true)
-    const supabase = createClient()
+    try {
+      // 1) members (join profiles)
+      const { data: classMembers, error: membersError } = await supabase
+        .from("class_members")
+        .select("id, class_id, user_id, role, joined_at, profiles(id, full_name, email, created_at)")
+        .eq("class_id", cls.id)
 
-    // Lấy thành viên lớp kèm profile
-    const { data: classMembers, error: membersError } = await supabase
-      .from("class_members")
-      .select("id, class_id, joined_at, role, profiles(id, full_name, email, avatar_url, created_at)")
-      .eq("class_id", cls.id)
+      if (membersError) console.error("membersError", membersError)
 
-    if (membersError) {
-      console.error("Error fetching class members", membersError)
+      // 2) class_scores join game
+      const { data: scoresData, error: scoresError } = await supabase
+        .from("class_scores")
+        .select("class_id, game_id, total_score, max_score, avg_score, updated_at, game(id, title, thumbnail_url, category)")
+        .eq("class_id", cls.id)
+
+      if (scoresError) console.error("scoresError", scoresError)
+
+      // 3) results for users in this class
+      const userIds = (classMembers || []).map((m: any) => m.user_id).filter(Boolean)
+      let resultsData: any[] = []
+      if (userIds.length > 0) {
+        const res = await supabase
+          .from("results")
+          .select("id, user_id, quiz_id, score, total_questions, completed_at, quizzes(id, title)")
+          .in("user_id", userIds)
+          .order("completed_at", { ascending: false })
+        resultsData = res.data || []
+      }
+
+      setMembers(classMembers || [])
+      setClassScores(scoresData || [])
+      setResults(resultsData || [])
+
+      // aggregate simple stats
+      const totalPlays = (resultsData || []).length
+      const avgScore =
+        totalPlays > 0 ? Math.round(((resultsData as any[]).reduce((s, r) => s + (r.score || 0), 0) / totalPlays) * 100) / 100 : 0
+      setAgg({ totalPlays, avgScore })
+    } catch (err) {
+      console.error("Error loading class details", err)
+    } finally {
+      setLoading(false)
     }
-
-    // Lấy điểm liên quan tới class (class_scores) và chi tiết trò chơi (game)
-    const { data: classScores, error: scoresError } = await supabase
-      .from("class_scores")
-      .select("class_id, game_id, total_score, max_score, avg_score, updated_at, game(id, title, category)")
-      .eq("class_id", cls.id)
-
-    if (scoresError) {
-      console.error("Error fetching class scores", scoresError)
-    }
-
-    // Lấy bảng kết quả cá nhân (results) cho các user thuộc lớp để hiển thị chi tiết làm bài
-    const userIds = (classMembers || []).map((m: any) => m.profiles?.id).filter(Boolean)
-    let results: any[] = []
-    if (userIds.length > 0) {
-      const { data: resultsData } = await supabase
-        .from("results")
-        .select("id, user_id, quiz_id, score, total_questions, completed_at, quizzes(title)")
-        .in("user_id", userIds)
-        .order("completed_at", { ascending: false })
-      results = resultsData || []
-    }
-
-    setMembers(classMembers || [])
-    setScores(classScores || [])
-
-    // tổng hợp đơn giản
-    const totalPlays = (results || []).length
-    const avgScore =
-      totalPlays > 0 ? Math.round(((results as any[]).reduce((s, r) => s + (r.score || 0), 0) / totalPlays) * 100) / 100 : 0
-    setAggStats({ totalPlays, avgScore })
-
-    setLoading(false)
   }
 
   if (loading) {
@@ -94,12 +96,12 @@ export default function ClassDetailsDashboard({ cls, onClose }: Props) {
           <p className="text-sm text-gray-600">{cls.description}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-sm text-gray-500">Tổng lượt làm bài</div>
-            <div className="text-lg font-bold">{aggStats.totalPlays}</div>
+            <div className="text-lg font-bold">{agg.totalPlays}</div>
             <div className="text-sm text-gray-500">Điểm trung bình</div>
-            <div className="text-lg font-bold">{aggStats.avgScore}</div>
+            <div className="text-lg font-bold">{agg.avgScore}</div>
           </div>
 
           <Button variant="outline" onClick={onClose}>
@@ -132,8 +134,8 @@ export default function ClassDetailsDashboard({ cls, onClose }: Props) {
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {scores.length === 0 && <div className="text-sm text-gray-600">Chưa có dữ liệu điểm cho lớp này.</div>}
-            {scores.map((s: any) => (
+            {classScores.length === 0 && <div className="text-sm text-gray-600">Chưa có dữ liệu điểm cho lớp này.</div>}
+            {classScores.map((s: any) => (
               <div key={s.game_id} className="border rounded p-4 bg-white">
                 <div className="font-semibold">{s.game?.title || s.game_id}</div>
                 <div className="text-sm text-gray-600">Thể loại: {s.game?.category || "-"}</div>
@@ -144,6 +146,36 @@ export default function ClassDetailsDashboard({ cls, onClose }: Props) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-3">Kết quả chi tiết</h3>
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="p-2 text-left">Học sinh</th>
+                  <th className="p-2 text-left">Bài kiểm tra</th>
+                  <th className="p-2 text-left">Điểm</th>
+                  <th className="p-2 text-left">Hoàn thành</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r) => (
+                  <tr key={r.id} className="border-b">
+                    <td className="p-2">
+                      {members.find((m) => m.user_id === r.user_id)?.profiles?.full_name ||
+                        members.find((m) => m.user_id === r.user_id)?.profiles?.email ||
+                        r.user_id}
+                    </td>
+                    <td className="p-2">{r.quizzes?.title || r.quiz_id}</td>
+                    <td className="p-2 font-bold">{r.score}</td>
+                    <td className="p-2">{r.completed_at ? new Date(r.completed_at).toLocaleDateString() : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </CardContent>
