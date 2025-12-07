@@ -6,18 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { createClient } from "@/lib/supabase/client"
-import { Play, Clock, Trophy } from "lucide-react"
-import { Brain } from "lucide-react"
+import { Play, Clock, Trophy, Brain } from "lucide-react"
 
 interface Quiz {
   id: string
   title: string
   description: string
   created_at: string
-}
-
-interface StudentQuizzesProps {
-  quizzes: Quiz[]
+  class_id: string // Thêm class_id để biết quiz thuộc lớp nào
 }
 
 interface CompletedQuiz {
@@ -26,27 +22,45 @@ interface CompletedQuiz {
   total_questions: number
 }
 
-export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
+export function StudentQuizzes() {
+  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+  const [completedQuizzes, setCompletedQuizzes] = useState<CompletedQuiz[]>([])
+  const [totalScore, setTotalScore] = useState<number | null>(null)
   const [activeQuiz, setActiveQuiz] = useState<string | null>(null)
   const [quizQuestions, setQuizQuestions] = useState<any[]>([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [answers, setAnswers] = useState<{ [key: string]: string }>({})
   const [showResults, setShowResults] = useState(false)
-  const [score, setScore] = useState(0)
-  const [totalScore, setTotalScore] = useState<number | null>(null)
-  const [completedQuizzes, setCompletedQuizzes] = useState<CompletedQuiz[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const supabase = createClient()
 
-  // Load completed quizzes on mount
   useEffect(() => {
-    const fetchCompleted = async () => {
+    const fetchQuizzes = async () => {
+      setIsLoading(true)
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
+        // 1️⃣ Lấy danh sách lớp học sinh tham gia
+        const { data: classMembers } = await supabase
+          .from("class_members")
+          .select("class_id")
+          .eq("user_id", user.id)
+
+        const studentClassIds = classMembers?.map(c => c.class_id) || []
+
+        // 2️⃣ Lấy quiz chỉ thuộc các lớp học sinh tham gia
+        const { data: quizData } = await supabase
+          .from("quizzes")
+          .select("*")
+          .in("class_id", studentClassIds)
+          .order("created_at", { ascending: false })
+
+        setQuizzes(quizData || [])
+
+        // 3️⃣ Lấy kết quả đã làm
         const { data: results } = await supabase
           .from("results")
           .select("*")
@@ -58,9 +72,12 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
         setTotalScore(totalScoreSum)
       } catch (err) {
         console.error(err)
+      } finally {
+        setIsLoading(false)
       }
     }
-    fetchCompleted()
+
+    fetchQuizzes()
   }, [])
 
   const startQuiz = async (quizId: string) => {
@@ -79,7 +96,6 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
         setAnswers({})
         setSelectedAnswer(null)
         setShowResults(false)
-        setScore(0)
       }
     } catch (error) {
       console.error("Error loading quiz:", error)
@@ -110,7 +126,6 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
       if (finalAnswers[q.id] === q.correct_answer) correctCount++
     })
 
-    setScore(correctCount)
     setShowResults(true)
 
     try {
@@ -123,7 +138,6 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
           total_questions: quizQuestions.length,
         })
 
-        // Cập nhật completedQuizzes và totalScore
         setCompletedQuizzes(prev => [...prev, { quiz_id: activeQuiz, score: correctCount, total_questions: quizQuestions.length }])
         setTotalScore(prev => (prev || 0) + correctCount)
       }
@@ -139,10 +153,9 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
     setSelectedAnswer(null)
     setAnswers({})
     setShowResults(false)
-    setScore(0)
   }
 
-  // Quiz đang làm
+  // --- Render Quiz đang làm ---
   if (activeQuiz && !showResults) {
     const question = quizQuestions[currentQuestion]
     const progress = ((currentQuestion + 1) / quizQuestions.length) * 100
@@ -182,9 +195,12 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
     )
   }
 
-  // Hiển thị kết quả quiz
+  // --- Render kết quả quiz ---
   if (showResults) {
-    const percentage = Math.round((score / quizQuestions.length) * 100)
+    const score = completedQuizzes.find(c => c.quiz_id === activeQuiz)?.score || 0
+    const totalQuestions = completedQuizzes.find(c => c.quiz_id === activeQuiz)?.total_questions || 1
+    const percentage = Math.round((score / totalQuestions) * 100)
+
     return (
       <div className="max-w-2xl mx-auto">
         <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
@@ -194,7 +210,7 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Quiz Complete!</h2>
             <p className="text-lg text-gray-700 mb-2">
-              You scored <span className="font-bold text-green-600">{score}</span> out of <span className="font-bold">{quizQuestions.length}</span> ({percentage}%)
+              You scored <span className="font-bold text-green-600">{score}</span> out of <span className="font-bold">{totalQuestions}</span> ({percentage}%)
             </p>
             {totalScore !== null && (
               <p className="text-lg text-gray-700 mb-4">
@@ -210,7 +226,7 @@ export function StudentQuizzes({ quizzes }: StudentQuizzesProps) {
     )
   }
 
-  // Danh sách quiz
+  // --- Render danh sách quiz ---
   return (
     <div className="space-y-6">
       {quizzes.length === 0 ? (
