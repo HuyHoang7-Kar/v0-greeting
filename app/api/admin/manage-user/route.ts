@@ -1,7 +1,10 @@
 // /app/api/admin/manage-user/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseServer } from "@/lib/supabase/server-client"
- // import từ file bạn vừa viết
+import sgMail from "@sendgrid/mail"
+
+// Set API key SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer()
@@ -13,8 +16,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Thiếu thông tin user" }, { status: 400 })
       }
 
-      const tempPassword = Math.random().toString(36).slice(-8)
+      const tempPassword = Math.random().toString(36).slice(-10)
 
+      // Tạo user Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email,
         password: tempPassword,
@@ -24,6 +28,7 @@ export async function POST(req: NextRequest) {
 
       if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
 
+      // Thêm vào bảng profiles
       const { error: profileError } = await supabase.from("profiles").insert({
         id: authData.user.id,
         email,
@@ -36,28 +41,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: profileError.message }, { status: 500 })
       }
 
-      return NextResponse.json({ success: true })
+      // ===== Gửi email mật khẩu tạm thời =====
+      try {
+        await sgMail.send({
+          to: email,
+          from: "no-reply@your-app.com",
+          subject: "Thông tin đăng nhập tài khoản",
+          html: `
+            <p>Xin chào ${full_name},</p>
+            <p>Tài khoản của bạn đã được tạo thành công.</p>
+            <p>Email: <strong>${email}</strong></p>
+            <p>Mật khẩu tạm thời: <strong>${tempPassword}</strong></p>
+            <p>Vui lòng đăng nhập và đổi mật khẩu ngay sau khi đăng nhập: <a href="https://your-app.vercel.app/login">Đăng nhập</a></p>
+          `
+        })
+      } catch (mailErr: any) {
+        console.error("Gửi email thất bại:", mailErr.message)
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: { id: authData.user.id, email, full_name, role }
+      })
     }
 
+    // ===== Xóa user =====
     if (action === "delete") {
       if (!id) return NextResponse.json({ error: "Thiếu id user" }, { status: 400 })
-
       await supabase.from("class_members").delete().eq("user_id", id)
       await supabase.from("game_plays").delete().eq("user_id", id)
       await supabase.from("game_scores").delete().eq("user_id", id)
       await supabase.from("notes").delete().eq("user_id", id)
       await supabase.from("profiles").delete().eq("id", id)
       await supabase.auth.admin.deleteUser(id)
-
       return NextResponse.json({ success: true })
     }
 
+    // ===== Update role =====
     if (action === "updateRole") {
       if (!id || !role) return NextResponse.json({ error: "Thiếu thông tin" }, { status: 400 })
-
       const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
       return NextResponse.json({ success: true })
     }
 
