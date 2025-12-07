@@ -22,25 +22,36 @@ interface StudentFlashcardsProps {
   userId: string
 }
 
-// Component riêng cho mỗi flashcard (flip state riêng)
 function FlashcardItem({ flashcard, userId }: { flashcard: Flashcard; userId: string }) {
   const [isFlipped, setIsFlipped] = useState(false)
 
+  const bgClass =
+    flashcard.created_by === userId
+      ? "bg-blue-50 border-blue-200"
+      : "bg-yellow-50 border-yellow-200"
+
   return (
-    <Card
-      className={`relative border-2 cursor-pointer transition-transform duration-500 ${
-        flashcard.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"
-      }`}
-      onClick={() => setIsFlipped(!isFlipped)}
-    >
-      <CardContent className="p-4 h-40 flex items-center justify-center">
-        {!isFlipped ? (
-          <p className="font-medium text-center">{flashcard.question}</p>
-        ) : (
-          <p className="text-gray-700 text-center">{flashcard.answer}</p>
-        )}
-      </CardContent>
-    </Card>
+    <div className="perspective-1000 w-full h-48" onClick={() => setIsFlipped(!isFlipped)}>
+      <div
+        className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d cursor-pointer ${
+          isFlipped ? "rotate-y-180" : ""
+        }`}
+      >
+        {/* Front */}
+        <Card className={`absolute inset-0 w-full h-full backface-hidden border-2 ${bgClass}`}>
+          <CardContent className="flex items-center justify-center h-full p-4">
+            <p className="text-center font-medium text-gray-900">{flashcard.question}</p>
+          </CardContent>
+        </Card>
+
+        {/* Back */}
+        <Card className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 border-2 ${bgClass}`}>
+          <CardContent className="flex items-center justify-center h-full p-4">
+            <p className="text-center text-gray-700">{flashcard.answer}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }
 
@@ -138,12 +149,10 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   return (
     <div className="space-y-6">
-      {/* Nút hiện form */}
       <Button onClick={() => setShowCreateForm(!showCreateForm)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
         {showCreateForm ? "Đóng Form" : "+ Tạo Flashcard"}
       </Button>
 
-      {/* Form tạo flashcard */}
       {showCreateForm && (
         <Card className="border-2 border-yellow-200 bg-yellow-50">
           <CardHeader>
@@ -178,7 +187,6 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         </Card>
       )}
 
-      {/* Hiển thị flashcards theo lớp */}
       {classes.map((cls) => {
         const flashcardsOfClass = flashcards.filter((f) => f.class_id === cls.id)
         if (flashcardsOfClass.length === 0) return null
