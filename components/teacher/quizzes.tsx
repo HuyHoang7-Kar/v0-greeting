@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,19 +23,43 @@ interface TeacherQuizzesProps {
 }
 
 export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps) {
-  const supabase = createClient()
   const [selectedQuiz, setSelectedQuiz] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
   const handleDeleteQuiz = async (id: string) => {
     if (!confirm("Are you sure you want to delete this quiz and all its questions?")) return
     setIsDeleting(id)
+
     try {
-      await supabase.from("quiz_questions").delete().eq("quiz_id", id)
-      await supabase.from("quizzes").delete().eq("id", id)
+      // Lấy user hiện tại
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) throw new Error("User not authenticated")
+      if (userError) throw userError
+
+      // Xóa tất cả câu hỏi của quiz này (chỉ xóa câu hỏi do user tạo)
+      const { error: delQuestionsError } = await supabase
+        .from("quiz_questions")
+        .delete()
+        .eq("quiz_id", id)
+        .eq("created_by", user.id)
+
+      if (delQuestionsError) throw delQuestionsError
+
+      // Xóa quiz (chỉ xóa quiz do user tạo)
+      const { error: delQuizError } = await supabase
+        .from("quizzes")
+        .delete()
+        .eq("id", id)
+        .eq("created_by", user.id)
+
+      if (delQuizError) throw delQuizError
+
       onQuizzesChange()
-    } catch (err) {
+      alert("Quiz deleted successfully!")
+    } catch (err: any) {
       console.error("Delete quiz error:", err)
+      alert("Failed to delete quiz: " + err.message)
     } finally {
       setIsDeleting(null)
     }
@@ -80,7 +104,7 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
                     <CardTitle className="text-lg text-gray-900">{quiz.title}</CardTitle>
                     <CardDescription className="text-gray-600">{quiz.description}</CardDescription>
                     <p className="text-sm mt-1 text-gray-500">
-                      {quiz.question_count} question(s) | Total points: {quiz.total_points}
+                      {quiz.question_count ?? 0} question(s) | Total points: {quiz.total_points ?? 0}
                     </p>
                   </div>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-800">Quiz</Badge>
@@ -90,7 +114,12 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
                 <div className="flex justify-between">
                   <p className="text-sm text-gray-500">Created {new Date(quiz.created_at).toLocaleDateString()}</p>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setSelectedQuiz(quiz.id)} className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedQuiz(quiz.id)}
+                      className="flex items-center gap-1"
+                    >
                       <Eye className="w-4 h-4" /> Questions
                     </Button>
                     <Button
@@ -100,7 +129,9 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
                       disabled={isDeleting === quiz.id}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      {isDeleting === quiz.id ? <Loader2 className="animate-spin w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                      {isDeleting === quiz.id
+                        ? <Loader2 className="animate-spin w-4 h-4" />
+                        : <Trash2 className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
