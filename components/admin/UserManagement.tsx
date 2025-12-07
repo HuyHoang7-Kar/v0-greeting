@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -11,8 +11,7 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
-  // Client dùng service key để gọi các hành động admin
-  const supabase = createClient()
+  const supabase = createClient() // browser client
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -20,11 +19,12 @@ export default function UserManagement() {
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
+  // Lấy danh sách user từ profiles
   const fetchUsers = async () => {
     setLoading(true)
     try {
       const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
-      if (error) console.error(error)
+      if (error) console.error("Error fetching users:", error)
       else setUsers(data ?? [])
     } catch (err) {
       console.error(err)
@@ -38,28 +38,24 @@ export default function UserManagement() {
     fetchUsers()
   }, [])
 
-  // Thêm user
+  // Gọi API server để tạo user
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
+
     try {
-      // Tạo user auth mới với password random
-      const password = Math.random().toString(36).slice(-8)
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: newEmail,
-        password,
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          email: newEmail,
+          full_name: newFullName,
+          role: newRole,
+        }),
       })
-      if (error) throw error
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
 
-      // Tạo profile
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        email: newEmail,
-        full_name: newFullName,
-        role: newRole,
-      })
-      if (profileError) throw profileError
-
-      alert(`Tạo user thành công. Mật khẩu tạm: ${password}`)
       setNewEmail("")
       setNewFullName("")
       setNewRole("student")
@@ -69,46 +65,33 @@ export default function UserManagement() {
     }
   }
 
-  // Xóa user + dữ liệu liên quan
+  // Gọi API server để xóa user
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
-      const tablesToDelete = [
-        { table: "class_members", column: "user_id" },
-        { table: "flashcards", column: "created_by" },
-        { table: "game_scores", column: "user_id" },
-        { table: "game_plays", column: "user_id" },
-        { table: "notes", column: "user_id" },
-        { table: "quizzes", column: "created_by" },
-        { table: "quiz_questions", column: "created_by" },
-        { table: "user_totals", column: "user_id" },
-      ]
-
-      for (const item of tablesToDelete) {
-        const { error } = await supabase.from(item.table).delete().eq(item.column, id)
-        if (error) throw error
-      }
-
-      // Xóa profile
-      const { error: profileError } = await supabase.from("profiles").delete().eq("id", id)
-      if (profileError) throw profileError
-
-      // Xóa user auth
-      const { error: authError } = await supabase.auth.admin.deleteUser(id)
-      if (authError) throw authError
-
-      alert("Xóa user thành công!")
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
     }
   }
 
-  // Cập nhật role
+  // Gọi API server để cập nhật role
   const handleUpdateRole = async (id: string, role: string) => {
     try {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
-      if (error) throw error
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateRole", id, role }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
       fetchUsers()
     } catch (err: any) {
       alert("Cập nhật role thất bại: " + err.message)
@@ -180,7 +163,7 @@ export default function UserManagement() {
                   <option value="admin">Admin</option>
                 </select>
               </td>
-              <td className="border px-3 py-1 flex gap-2">
+              <td className="border px-3 py-1">
                 <button
                   onClick={() => handleDeleteUser(user.id)}
                   className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"

@@ -1,42 +1,49 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase/server-client"
+import { supabaseServer } from "@/lib/supabase/server-client"
 
 export async function POST(req: NextRequest) {
+  const supabase = supabaseServer()
   const body = await req.json()
   const { action, id, email, full_name, role } = body
 
   try {
     if (action === "create") {
-      // Tạo user auth
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      const { data, error } = await supabase.auth.admin.createUser({
         email,
-        password: Math.random().toString(36).slice(-8)
+        password: Math.random().toString(36).slice(-8),
       })
-      if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-      // Thêm vào profiles
-      const { error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .insert({ id: authData.user.id, email, full_name, role })
-      if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        email,
+        full_name,
+        role,
+      })
+      if (profileError)
+        return NextResponse.json({ error: profileError.message }, { status: 500 })
 
       return NextResponse.json({ success: true })
     }
 
     if (action === "delete") {
-      // Xóa profile trước để tránh FK error
-      const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", id)
+      // Xóa tất cả FK liên quan trước
+      await supabase.from("class_members").delete().eq("user_id", id)
+      await supabase.from("game_plays").delete().eq("user_id", id)
+      await supabase.from("game_scores").delete().eq("user_id", id)
+      await supabase.from("notes").delete().eq("user_id", id)
+
+      const { error: profileError } = await supabase.from("profiles").delete().eq("id", id)
       if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
 
-      // Xóa user auth
-      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id)
+      const { error: authError } = await supabase.auth.admin.deleteUser(id)
       if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
 
       return NextResponse.json({ success: true })
     }
 
     if (action === "updateRole") {
-      const { error } = await supabaseAdmin.from("profiles").update({ role }).eq("id", id)
+      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ success: true })
     }
