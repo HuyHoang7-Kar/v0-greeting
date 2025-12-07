@@ -52,20 +52,29 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Lấy danh sách lớp từ Supabase
+  // Lấy user hiện tại và danh sách lớp do user đó tạo
   useEffect(() => {
-    const fetchClasses = async () => {
-      const { data, error } = await supabase
-        .from("classes")
-        .select("id, name")
-        .order("created_at", { ascending: false })
-      if (error) {
-        console.error("Error fetching classes:", error)
-      } else {
-        setClasses(data)
+    const fetchTeacherClasses = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError) throw userError
+        if (!user) throw new Error("Bạn phải đăng nhập")
+
+        const { data, error } = await supabase
+          .from("classes")
+          .select("id, name")
+          .eq("created_by", user.id)
+          .order("created_at", { ascending: false })
+
+        if (error) throw error
+        setClasses(data || [])
+      } catch (err: any) {
+        console.error("Error fetching teacher classes:", err)
+        setError(err.message || JSON.stringify(err))
       }
     }
-    fetchClasses()
+
+    fetchTeacherClasses()
   }, [])
 
   // 1️⃣ Tạo quiz
@@ -85,9 +94,10 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
         title,
         description,
         created_by: user.id,
-        class_id: selectedClassId // gắn quiz vào lớp
+        class_id: selectedClassId
       }).select().single()
       if (error) throw error
+
       setQuizId(data.id)
       setStep("addQuestions")
     } catch (err: any) {
@@ -155,7 +165,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          {/* Dropdown chọn lớp */}
+          {/* Dropdown chọn lớp của giáo viên hiện tại */}
           <Select
             value={selectedClassId || ""}
             onValueChange={(v) => setSelectedClassId(v)}
