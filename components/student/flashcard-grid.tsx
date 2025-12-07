@@ -4,11 +4,13 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Book, Lightbulb, Sigma, Beaker } from "lucide-react"
 
 interface Flashcard {
   id: string
   question: string
   answer: string
+  category?: "vocabulary" | "grammar" | "concept" | "science"
   class_id: string | null
   created_by: string
 }
@@ -34,6 +36,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [category, setCategory] = useState<string>("vocabulary")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -95,7 +98,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       const payload = {
         question: question.trim(),
         answer: answer.trim(),
-        class_id: selectedClassId || null, // null nếu flashcard riêng
+        category,
+        class_id: selectedClassId || null,
         created_by: userId,
       }
 
@@ -110,6 +114,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       setQuestion("")
       setAnswer("")
       setSelectedClassId(null)
+      setCategory("vocabulary")
       setShowForm(false)
     } catch (err: any) {
       console.error(err)
@@ -121,22 +126,25 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
+  // Màu sắc pastel theo category
+  const categoryColors: Record<string, string> = {
+    vocabulary: "bg-green-100 border-green-300",
+    grammar: "bg-pink-100 border-pink-300",
+    concept: "bg-yellow-100 border-yellow-300",
+    science: "bg-blue-100 border-blue-300",
+  }
+
+  const categoryIcons: Record<string, JSX.Element> = {
+    vocabulary: <Book className="w-5 h-5 text-green-700" />,
+    grammar: <Lightbulb className="w-5 h-5 text-pink-700" />,
+    concept: <Sigma className="w-5 h-5 text-yellow-700" />,
+    science: <Beaker className="w-5 h-5 text-blue-700" />,
+  }
+
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
-
-    const colors = [
-      "from-red-100 to-red-200",
-      "from-blue-100 to-blue-200",
-      "from-green-100 to-green-200",
-      "from-yellow-100 to-yellow-200",
-      "from-purple-100 to-purple-200",
-      "from-pink-100 to-pink-200",
-      "from-indigo-100 to-indigo-200",
-    ]
-    const colorIndex =
-      Math.abs(flashcard.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) %
-      colors.length
-    const gradient = colors[colorIndex]
+    const colorClass = flashcard.category ? categoryColors[flashcard.category] : "bg-gray-100 border-gray-300"
+    const icon = flashcard.category ? categoryIcons[flashcard.category] : null
 
     return (
       <div
@@ -149,16 +157,28 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           }`}
         >
           {/* Front */}
-          <Card className="absolute inset-0 w-full h-full backface-hidden rounded-xl shadow-2xl bg-white">
-            <CardContent className={`flex items-center justify-center h-full p-4 bg-gradient-to-br ${gradient}`}>
-              <p className="text-center font-bold text-lg">{flashcard.question}</p>
+          <Card className={`absolute inset-0 w-full h-full backface-hidden rounded-xl shadow-lg border ${colorClass} bg-white`}>
+            <CardContent className="flex flex-col justify-between h-full p-4">
+              <div className="flex justify-between items-start">
+                <h3 className="text-lg font-bold text-gray-900">{flashcard.question}</h3>
+                {icon}
+              </div>
+              <p className="text-sm text-gray-500 text-center mt-auto">Click để xem đáp án</p>
             </CardContent>
           </Card>
 
           {/* Back */}
-          <Card className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-2xl bg-white">
-            <CardContent className={`flex items-center justify-center h-full p-4 bg-gradient-to-br ${gradient}`}>
-              <p className="text-center text-gray-800">{flashcard.answer}</p>
+          <Card className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-lg border ${colorClass} bg-white`}>
+            <CardContent className="flex flex-col justify-between h-full p-4">
+              <div className="flex justify-between items-start">
+                <h3 className="text-lg font-bold text-gray-900">Đáp án</h3>
+                {icon}
+              </div>
+              <ul className="text-sm text-gray-700 list-disc list-inside mt-2">
+                {flashcard.answer.split("\n").map((line, idx) => (
+                  <li key={idx}>{line}</li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </div>
@@ -204,9 +224,23 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="block font-medium">Danh mục *</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="vocabulary">Từ vựng</option>
+                  <option value="grammar">Ngữ pháp</option>
+                  <option value="concept">Khái niệm</option>
+                  <option value="science">Thuật ngữ khoa học</option>
+                </select>
+              </div>
+
               {joinedClassIds.length > 0 && (
                 <div className="space-y-2">
-                  <label className="block font-medium">Chọn Lớp (tùy chọn)</label>
+                  <label className="block font-medium">Chọn lớp (tùy chọn)</label>
                   <select
                     value={selectedClassId || ""}
                     onChange={(e) => setSelectedClassId(e.target.value || null)}
@@ -252,7 +286,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         )
       })}
 
-      {/* Flashcards riêng tư của học sinh */}
+      {/* Flashcards riêng của học sinh */}
       {flashcards.filter((f) => f.created_by === userId && !f.class_id).length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4">Flashcards riêng của bạn</h2>
