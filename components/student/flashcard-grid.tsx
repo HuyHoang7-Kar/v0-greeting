@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 
 interface Flashcard {
   id: string
@@ -23,6 +22,28 @@ interface StudentFlashcardsProps {
   userId: string
 }
 
+// Component riêng cho mỗi flashcard (flip state riêng)
+function FlashcardItem({ flashcard, userId }: { flashcard: Flashcard; userId: string }) {
+  const [isFlipped, setIsFlipped] = useState(false)
+
+  return (
+    <Card
+      className={`relative border-2 cursor-pointer transition-transform duration-500 ${
+        flashcard.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"
+      }`}
+      onClick={() => setIsFlipped(!isFlipped)}
+    >
+      <CardContent className="p-4 h-40 flex items-center justify-center">
+        {!isFlipped ? (
+          <p className="font-medium text-center">{flashcard.question}</p>
+        ) : (
+          <p className="text-gray-700 text-center">{flashcard.answer}</p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   const supabase = createClient()
 
@@ -31,7 +52,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [showForm, setShowForm] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +83,6 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         .from("classes")
         .select("id,name")
         .in("id", classIds)
-
       setClasses(classesData || [])
 
       const { data: flashcardsData } = await supabase
@@ -70,7 +90,6 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         .select("*")
         .or([...classIds.map((id) => `class_id.eq.${id}`), `created_by.eq.${userId}`].join(","))
         .order("created_at", { ascending: false })
-
       setFlashcards(flashcardsData || [])
     } catch (err) {
       console.error("❌ Lỗi load dữ liệu:", err)
@@ -106,7 +125,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       setFlashcards((prev) => [...data, ...prev])
       setQuestion("")
       setAnswer("")
-      setShowForm(false)
+      setShowCreateForm(false)
     } catch (err: any) {
       console.error(err)
       setError(err.message || "Tạo flashcard thất bại")
@@ -118,20 +137,17 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   if (loading) return <p>Đang tải dữ liệu...</p>
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Nút hiện form */}
-      <Button
-        onClick={() => setShowForm(!showForm)}
-        className="bg-yellow-500 hover:bg-yellow-600 text-white"
-      >
-        {showForm ? "Đóng Form" : "Tạo Flashcard"}
+      <Button onClick={() => setShowCreateForm(!showCreateForm)} className="bg-yellow-500 hover:bg-yellow-600 text-white">
+        {showCreateForm ? "Đóng Form" : "+ Tạo Flashcard"}
       </Button>
 
       {/* Form tạo flashcard */}
-      {showForm && (
+      {showCreateForm && (
         <Card className="border-2 border-yellow-200 bg-yellow-50">
           <CardHeader>
-            <CardTitle>Tạo Flashcard của bạn</CardTitle>
+            <CardTitle>Tạo Flashcard</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateFlashcard} className="space-y-4">
@@ -140,25 +156,20 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                 <textarea
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  required
                   placeholder="Nhập câu hỏi"
                   className="w-full p-2 border rounded"
                 />
               </div>
-
               <div className="space-y-2">
                 <label className="block font-medium">Câu Trả Lời *</label>
                 <textarea
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  required
                   placeholder="Nhập câu trả lời"
                   className="w-full p-2 border rounded"
                 />
               </div>
-
               {error && <p className="text-red-600">{error}</p>}
-
               <Button type="submit" disabled={isSubmitting} className="bg-yellow-500 hover:bg-yellow-600 text-white">
                 {isSubmitting ? "Đang tạo..." : "Tạo Flashcard"}
               </Button>
@@ -167,7 +178,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         </Card>
       )}
 
-      {/* Hiển thị flashcards kiểu lật */}
+      {/* Hiển thị flashcards theo lớp */}
       {classes.map((cls) => {
         const flashcardsOfClass = flashcards.filter((f) => f.class_id === cls.id)
         if (flashcardsOfClass.length === 0) return null
@@ -175,37 +186,9 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div key={cls.id}>
             <h2 className="text-xl font-bold mb-2">{cls.name}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {flashcardsOfClass.map((f) => {
-                const [isFlipped, setIsFlipped] = useState(false)
-                return (
-                  <div
-                    key={f.id}
-                    className="relative w-full h-48 cursor-pointer perspective-1000"
-                    onClick={() => setIsFlipped(!isFlipped)}
-                  >
-                    {/* Front */}
-                    <Card
-                      className={`absolute inset-0 w-full h-full transition-transform duration-700 transform-style-preserve-3d backface-hidden ${
-                        isFlipped ? "rotate-y-180" : ""
-                      } border-2 ${f.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"}`}
-                    >
-                      <CardContent className="flex items-center justify-center text-center">
-                        <p className="text-gray-900 font-medium">{f.question}</p>
-                      </CardContent>
-                    </Card>
-                    {/* Back */}
-                    <Card
-                      className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 transition-transform duration-700 transform-style-preserve-3d border-2 ${
-                        f.created_by === userId ? "border-blue-200 bg-blue-50" : "border-yellow-200 bg-yellow-50"
-                      }`}
-                    >
-                      <CardContent className="flex items-center justify-center text-center">
-                        <p className="text-gray-900 font-medium">{f.answer}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )
-              })}
+              {flashcardsOfClass.map((f) => (
+                <FlashcardItem key={f.id} flashcard={f} userId={userId} />
+              ))}
             </div>
           </div>
         )
