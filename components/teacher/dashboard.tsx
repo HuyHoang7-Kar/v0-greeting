@@ -13,6 +13,13 @@ import { TeacherAnalytics } from "@/components/teacher/analytics"
 import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { CreateClassForm } from "@/components/teacher/CreateClassForm"
+import dynamic from "next/dynamic"
+
+// import ClassDetailsDashboard dynamically to avoid SSR issues
+const ClassDetailsDashboard = dynamic(
+  () => import("./ClassDetailsDashboard").then((mod) => mod.default || mod),
+  { ssr: false }
+)
 
 interface Profile {
   id: string
@@ -43,10 +50,12 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateFlashcardForm, setShowCreateFlashcardForm] = useState(false)
   const [showCreateClassForm, setShowCreateClassForm] = useState(false)
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     loadDashboardData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadDashboardData = async () => {
@@ -90,9 +99,13 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     loadDashboardData()
   }
 
-  const goToClassDetails = (id: string) => {
-    // ⭐ Điều hướng CHUẨN App Router, không lỗi 404
-    router.push(`/teacher/classes/${id}`)
+  // MỞ chi tiết lớp nội bộ (không chuyển route)
+  const openClassDetails = (cls: Class) => {
+    setSelectedClass(cls)
+  }
+
+  const closeClassDetails = () => {
+    setSelectedClass(null)
   }
 
   if (isLoading) {
@@ -289,6 +302,14 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
             {showCreateClassForm && <CreateClassForm onSuccess={handleClassCreated} />}
 
+            {/* nếu đã chọn lớp thì hiển thị chi tiết ở trên danh sách */}
+            {selectedClass && (
+              <div className="mb-6">
+                {/* ClassDetailsDashboard tự fetch dữ liệu dựa trên selectedClass.id */}
+                <ClassDetailsDashboard cls={selectedClass} onClose={closeClassDetails} />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {classes.map((cls) => (
                 <Card key={cls.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
@@ -302,9 +323,9 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                       Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
                     </div>
 
-                    {/* ⭐ Điều hướng LỚP HỌC */}
+                    {/* Mở chi tiết lớp nội bộ */}
                     <Button
-                      onClick={() => goToClassDetails(cls.id)}
+                      onClick={() => openClassDetails(cls)}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       Xem Chi Tiết

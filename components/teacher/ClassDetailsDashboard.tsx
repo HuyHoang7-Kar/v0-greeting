@@ -1,183 +1,152 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BarChart3, Users, BookOpen, Brain } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Users, BarChart3, X } from "lucide-react"
+import React from "react"
 
-export default function ClassDetailsDashboard() {
-  const params = useParams()
-  const classId = params.id as string
+interface ClassProps {
+  id: string
+  name?: string
+  description?: string
+  created_at?: string
+}
 
-  const [cls, setCls] = useState<any>(null)
-  const [students, setStudents] = useState<any[]>([])
-  const [quizzes, setQuizzes] = useState<any[]>([])
-  const [results, setResults] = useState<any[]>([])
+interface Props {
+  cls: ClassProps
+  onClose: () => void
+}
+
+export default function ClassDetailsDashboard({ cls, onClose }: Props) {
+  const [members, setMembers] = useState<any[]>([])
+  const [scores, setScores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [aggStats, setAggStats] = useState<{ totalPlays: number; avgScore: number }>({ totalPlays: 0, avgScore: 0 })
 
   useEffect(() => {
     loadData()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cls?.id])
 
   const loadData = async () => {
+    setLoading(true)
     const supabase = createClient()
 
-    const { data: classData } = await supabase
-      .from("classes")
-      .select("*")
-      .eq("id", classId)
-      .single()
+    // Lấy thành viên lớp kèm profile
+    const { data: classMembers, error: membersError } = await supabase
+      .from("class_members")
+      .select("id, class_id, joined_at, role, profiles(id, full_name, email, avatar_url, created_at)")
+      .eq("class_id", cls.id)
 
-    const { data: studentData } = await supabase
-      .from("class_students")
-      .select("*, profiles(*)")
-      .eq("class_id", classId)
+    if (membersError) {
+      console.error("Error fetching class members", membersError)
+    }
 
-    const { data: quizData } = await supabase
-      .from("quizzes")
-      .select("*")
-      .eq("class_id", classId)
+    // Lấy điểm liên quan tới class (class_scores) và chi tiết trò chơi (game)
+    const { data: classScores, error: scoresError } = await supabase
+      .from("class_scores")
+      .select("class_id, game_id, total_score, max_score, avg_score, updated_at, game(id, title, category)")
+      .eq("class_id", cls.id)
 
-    const { data: resultData } = await supabase
-      .from("results")
-      .select("*")
-      .eq("class_id", classId)
+    if (scoresError) {
+      console.error("Error fetching class scores", scoresError)
+    }
 
-    setCls(classData)
-    setStudents(studentData || [])
-    setQuizzes(quizData || [])
-    setResults(resultData || [])
+    // Lấy bảng kết quả cá nhân (results) cho các user thuộc lớp để hiển thị chi tiết làm bài
+    const userIds = (classMembers || []).map((m: any) => m.profiles?.id).filter(Boolean)
+    let results: any[] = []
+    if (userIds.length > 0) {
+      const { data: resultsData } = await supabase
+        .from("results")
+        .select("id, user_id, quiz_id, score, total_questions, completed_at, quizzes(title)")
+        .in("user_id", userIds)
+        .order("completed_at", { ascending: false })
+      results = resultsData || []
+    }
+
+    setMembers(classMembers || [])
+    setScores(classScores || [])
+
+    // tổng hợp đơn giản
+    const totalPlays = (results || []).length
+    const avgScore =
+      totalPlays > 0 ? Math.round(((results as any[]).reduce((s, r) => s + (r.score || 0), 0) / totalPlays) * 100) / 100 : 0
+    setAggStats({ totalPlays, avgScore })
+
     setLoading(false)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-600">
-        Đang tải dữ liệu lớp học...
-      </div>
+      <Card className="p-6 mb-6 border-2 border-blue-200">
+        <p>Đang tải dữ liệu lớp...</p>
+      </Card>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <Card className="mb-6 border-2 border-blue-300 bg-white shadow-lg">
+      <CardHeader className="flex items-start justify-between gap-4">
+        <div>
+          <CardTitle className="text-2xl font-bold">{cls.name || "Chi tiết lớp"}</CardTitle>
+          <p className="text-sm text-gray-600">{cls.description}</p>
+        </div>
 
-        {/* Class Info */}
-        <Card className="border-2 border-blue-200">
-          <CardHeader>
-            <CardTitle className="text-3xl">{cls.name}</CardTitle>
-            <CardDescription>{cls.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-gray-600">
-            Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className="text-sm text-gray-500">Tổng lượt làm bài</div>
+            <div className="text-lg font-bold">{aggStats.totalPlays}</div>
+            <div className="text-sm text-gray-500">Điểm trung bình</div>
+            <div className="text-lg font-bold">{aggStats.avgScore}</div>
+          </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white border">
-            <TabsTrigger value="overview"><BookOpen className="w-4 h-4" /> Tổng Quan</TabsTrigger>
-            <TabsTrigger value="students"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
-            <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Bài Kiểm Tra</TabsTrigger>
-            <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
-          </TabsList>
+          <Button variant="outline" onClick={onClose}>
+            <X className="w-4 h-4" /> Đóng
+          </Button>
+        </div>
+      </CardHeader>
 
-          {/* OVERVIEW */}
-          <TabsContent value="overview">
-            <Card className="border-2 border-yellow-200">
-              <CardHeader>
-                <CardTitle>Tổng Quan Lớp</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <CardContent className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+            <Users className="w-5 h-5" /> Học sinh ({members.length})
+          </h3>
 
-                <Card className="border p-4 text-center">
-                  <h3 className="text-xl font-bold">{students.length}</h3>
-                  <p className="text-sm text-gray-600">Học sinh</p>
-                </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.map((m) => (
+              <div key={m.id} className="border rounded p-3 bg-gray-50">
+                <div className="font-semibold">{m.profiles?.full_name || m.profiles?.email}</div>
+                <div className="text-sm text-gray-600">{m.profiles?.email}</div>
+                <div className="text-xs text-gray-500 mt-1">Vai trò: {m.role}</div>
+                <div className="text-xs text-gray-500">Tham gia: {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : "-"}</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-                <Card className="border p-4 text-center">
-                  <h3 className="text-xl font-bold">{quizzes.length}</h3>
-                  <p className="text-sm text-gray-600">Bài kiểm tra</p>
-                </Card>
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+            <BarChart3 className="w-5 h-5" /> Điểm (class_scores)
+          </h3>
 
-                <Card className="border p-4 text-center">
-                  <h3 className="text-xl font-bold">{results.length}</h3>
-                  <p className="text-sm text-gray-600">Lượt làm bài</p>
-                </Card>
-
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* STUDENTS */}
-          <TabsContent value="students">
-            <Card className="border-2 border-green-200">
-              <CardHeader>
-                <CardTitle>Danh Sách Học Sinh</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {students.map((s) => (
-                    <li key={s.id} className="p-3 border rounded bg-white flex justify-between">
-                      <span>{s.profiles.full_name || s.profiles.email}</span>
-                      <span className="text-sm text-gray-600">
-                        Lượt làm bài: {results.filter(r => r.user_id === s.profiles.id).length}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* QUIZZES */}
-          <TabsContent value="quizzes">
-            <Card className="border-2 border-purple-200">
-              <CardHeader>
-                <CardTitle>Bài Kiểm Tra Trong Lớp</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {quizzes.map((q) => (
-                    <li key={q.id} className="p-4 border rounded bg-white">
-                      <div className="font-semibold">{q.title}</div>
-                      <div className="text-sm text-gray-600">
-                        Tổng lượt làm: {results.filter(r => r.quiz_id === q.id).length}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ANALYTICS */}
-          <TabsContent value="analytics">
-            <Card className="border-2 border-indigo-200">
-              <CardHeader>
-                <CardTitle>Phân Tích Điểm</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={results}>
-                      <XAxis dataKey="user_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="score" />
-                    </BarChart>
-                  </ResponsiveContainer>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {scores.length === 0 && <div className="text-sm text-gray-600">Chưa có dữ liệu điểm cho lớp này.</div>}
+            {scores.map((s: any) => (
+              <div key={s.game_id} className="border rounded p-4 bg-white">
+                <div className="font-semibold">{s.game?.title || s.game_id}</div>
+                <div className="text-sm text-gray-600">Thể loại: {s.game?.category || "-"}</div>
+                <div className="mt-2">
+                  <div className="text-sm">Max: <b>{s.max_score ?? 0}</b></div>
+                  <div className="text-sm">Avg: <b>{s.avg_score ?? 0}</b></div>
+                  <div className="text-sm text-gray-500">Cập nhật: {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : "-"}</div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-        </Tabs>
-      </div>
-    </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
