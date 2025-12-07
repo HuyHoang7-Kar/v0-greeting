@@ -31,7 +31,6 @@ interface CreateQuizProps {
 export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
   const supabase = createClient()
 
-  // State chính
   const [step, setStep] = useState<"createQuiz" | "addQuestions">("createQuiz")
   const [quizId, setQuizId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
@@ -52,7 +51,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Lấy user hiện tại và danh sách lớp do user đó tạo
+  // Lấy danh sách lớp mà giáo viên hiện tại là teacher_id
   useEffect(() => {
     const fetchTeacherClasses = async () => {
       try {
@@ -63,7 +62,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
         const { data, error } = await supabase
           .from("classes")
           .select("id, name")
-          .eq("created_by", user.id)
+          .eq("teacher_id", user.id) // dùng teacher_id thay cho created_by
           .order("created_at", { ascending: false })
 
         if (error) throw error
@@ -77,7 +76,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     fetchTeacherClasses()
   }, [])
 
-  // 1️⃣ Tạo quiz
   const handleCreateQuiz = async () => {
     if (!title.trim() || !selectedClassId) {
       setError("Bạn cần nhập tên quiz và chọn lớp")
@@ -107,7 +105,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     }
   }
 
-  // 2️⃣ Thêm câu hỏi vào state
   const handleAddQuestionToState = () => {
     if (!currentQuestion.question.trim()) return
     if (questions.length >= numQuestions) return
@@ -124,7 +121,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     })
   }
 
-  // 3️⃣ Lưu tất cả câu hỏi vào DB
   const handleSaveAllQuestions = async () => {
     if (!quizId) return
     setIsLoading(true)
@@ -141,9 +137,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     }
   }
 
-  // -------------------
-  // Render
-  // -------------------
   if (step === "createQuiz") {
     return (
       <Card className="p-4 border-2 border-blue-200">
@@ -165,7 +158,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          {/* Dropdown chọn lớp của giáo viên hiện tại */}
           <Select
             value={selectedClassId || ""}
             onValueChange={(v) => setSelectedClassId(v)}
@@ -197,7 +189,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     )
   }
 
-  // Add Questions Step
   return (
     <Card className="p-4 border-2 border-green-200">
       <CardHeader>
@@ -210,7 +201,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
       <CardContent className="space-y-2">
         {error && <p className="text-red-600">{error}</p>}
 
-        {/* Form nhập câu hỏi */}
         {questions.length < numQuestions && (
           <>
             <Textarea
@@ -256,7 +246,6 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
           </>
         )}
 
-        {/* Nút lưu khi đủ số câu hỏi */}
         {questions.length === numQuestions && (
           <Button
             onClick={handleSaveAllQuestions}
