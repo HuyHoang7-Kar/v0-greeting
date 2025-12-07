@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Book, Lightbulb, Sigma, Beaker } from "lucide-react"
 
 interface Flashcard {
   id: string
@@ -126,61 +125,107 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
-  // Màu sắc pastel theo category
-  const categoryColors: Record<string, string> = {
-    vocabulary: "bg-green-100 border-green-300",
-    grammar: "bg-pink-100 border-pink-300",
-    concept: "bg-yellow-100 border-yellow-300",
-    science: "bg-blue-100 border-blue-300",
-  }
-
-  const categoryIcons: Record<string, JSX.Element> = {
-    vocabulary: <Book className="w-5 h-5 text-green-700" />,
-    grammar: <Lightbulb className="w-5 h-5 text-pink-700" />,
-    concept: <Sigma className="w-5 h-5 text-yellow-700" />,
-    science: <Beaker className="w-5 h-5 text-blue-700" />,
-  }
-
+  // Component flashcard kiểu nghệ thuật
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
-    const colorClass = flashcard.category ? categoryColors[flashcard.category] : "bg-gray-100 border-gray-300"
-    const icon = flashcard.category ? categoryIcons[flashcard.category] : null
 
     return (
       <div
-        className="perspective-1000 w-full h-48 cursor-pointer"
+        className="w-64 h-40 perspective-1000 cursor-pointer"
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div
-          className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d ${
-            isFlipped ? "rotate-y-180" : ""
-          }`}
+          className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d shadow-lg rounded-xl`}
+          style={{
+            transformStyle: "preserve-3d",
+            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
         >
           {/* Front */}
-          <Card className={`absolute inset-0 w-full h-full backface-hidden rounded-xl shadow-lg border ${colorClass} bg-white`}>
-            <CardContent className="flex flex-col justify-between h-full p-4">
-              <div className="flex justify-between items-start">
-                <h3 className="text-lg font-bold text-gray-900">{flashcard.question}</h3>
-                {icon}
-              </div>
-              <p className="text-sm text-gray-500 text-center mt-auto">Click để xem đáp án</p>
-            </CardContent>
-          </Card>
+          <div
+            className="absolute inset-0 rounded-xl border"
+            style={{
+              background: "linear-gradient(145deg, #fefcf8, #fefaf5)", // nền trắng ngọc
+              border: "1px solid rgba(255, 215, 180, 0.5)", // viền vàng champagne
+              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+              backfaceVisibility: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "1rem",
+              fontFamily: "'Merriweather', serif",
+              color: "#333",
+              position: "relative",
+            }}
+          >
+            {/* Watercolor nhẹ góc trên */}
+            <div
+              style={{
+                position: "absolute",
+                top: "0.5rem",
+                right: "0.5rem",
+                width: "40px",
+                height: "40px",
+                background: "radial-gradient(circle at center, #a0c4ff55, #bdb2ff33)",
+                borderRadius: "50%",
+              }}
+            />
+            <h3 className="text-center text-lg font-semibold">{flashcard.question}</h3>
+            {/* Icon nhỏ ánh kim */}
+            <div
+              style={{
+                position: "absolute",
+                top: "0.5rem",
+                left: "0.5rem",
+                fontSize: "0.75rem",
+                color: "rgba(255, 215, 180, 0.9)", // vàng ánh kim
+              }}
+            >
+              ✒️
+            </div>
+            <p className="mt-auto text-xs text-gray-500 text-center">Click để xem đáp án</p>
+          </div>
 
           {/* Back */}
-          <Card className={`absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-xl shadow-lg border ${colorClass} bg-white`}>
-            <CardContent className="flex flex-col justify-between h-full p-4">
-              <div className="flex justify-between items-start">
-                <h3 className="text-lg font-bold text-gray-900">Đáp án</h3>
-                {icon}
-              </div>
-              <ul className="text-sm text-gray-700 list-disc list-inside mt-2">
-                {flashcard.answer.split("\n").map((line, idx) => (
-                  <li key={idx}>{line}</li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+          <div
+            className="absolute inset-0 rounded-xl border rotate-y-180"
+            style={{
+              background: "#fffdf8",
+              border: "1px solid rgba(255, 215, 180, 0.5)",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-start",
+              padding: "1rem",
+              fontFamily: "'Merriweather', serif",
+              color: "#333",
+              position: "relative",
+            }}
+          >
+            <h3 className="text-center text-lg font-semibold mb-2">Đáp án</h3>
+            <ul className="text-sm text-gray-700 list-inside" style={{ listStyleType: "circle" }}>
+              {flashcard.answer.split("\n").map((line, idx) => (
+                <li key={idx} className="mb-1">
+                  {line}
+                </li>
+              ))}
+            </ul>
+            {/* Đường kẻ pastel cuối thẻ */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: "0.5rem",
+                left: "10%",
+                width: "80%",
+                height: "2px",
+                background: "linear-gradient(90deg, #a0c4ff, #bdb2ff)",
+                borderRadius: "1px",
+              }}
+            />
+          </div>
         </div>
       </div>
     )
@@ -277,7 +322,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         return (
           <div key={cls.id}>
             <h2 className="text-xl font-bold mb-4">{cls.name}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {flashcardsOfClass.map((f) => (
                 <FlashcardItem key={f.id} flashcard={f} />
               ))}
@@ -290,7 +335,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       {flashcards.filter((f) => f.created_by === userId && !f.class_id).length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4">Flashcards riêng của bạn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {flashcards
               .filter((f) => f.created_by === userId && !f.class_id)
               .map((f) => (
