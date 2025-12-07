@@ -44,6 +44,7 @@ interface Class {
 export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -61,15 +62,18 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     try {
       const supabase = createClient()
 
-      const [flashcardsData, quizzesData, resultsData, classesData] = await Promise.all([
-        supabase.from("flashcards").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
-        supabase.from("quizzes").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
-        supabase.from("results").select("*").order("completed_at", { ascending: false }),
-        supabase.from("classes").select("*").eq("teacher_id", user.id).order("created_at", { ascending: false })
-      ])
+      const [flashcardsData, quizzesData, studentsData, resultsData, classesData] =
+        await Promise.all([
+          supabase.from("flashcards").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("quizzes").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("profiles").select("*").eq("role", "student").order("created_at", { ascending: false }),
+          supabase.from("results").select("*").order("completed_at", { ascending: false }),
+          supabase.from("classes").select("*").eq("teacher_id", user.id).order("created_at", { ascending: false })
+        ])
 
       setFlashcards(flashcardsData.data || [])
       setQuizzes(quizzesData.data || [])
+      setStudents(studentsData.data || [])
       setResults(resultsData.data || [])
       setClasses(classesData.data || [])
     } catch (error) {
@@ -95,6 +99,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     loadDashboardData()
   }
 
+  // MỞ chi tiết lớp nội bộ (không chuyển route)
   const openClassDetails = (cls: Class) => {
     setSelectedClass(cls)
   }
@@ -142,7 +147,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
       <div className="container mx-auto px-4 py-8">
         {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
             <CardContent className="p-6 flex items-center justify-between">
               <div>
@@ -160,6 +165,16 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                 <p className="text-3xl font-bold text-gray-900">{quizzes.length}</p>
               </div>
               <Brain className="w-8 h-8 text-blue-600" />
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tổng Học Sinh</p>
+                <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+              </div>
+              <Users className="w-8 h-8 text-green-600" />
             </CardContent>
           </Card>
 
@@ -202,13 +217,15 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
         {/* TABS */}
         <Tabs defaultValue="flashcards" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-gray-200">
+          <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
             <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
             <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
+            <TabsTrigger value="students"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
             <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
+          {/* FLASHCARDS TAB */}
           <TabsContent value="flashcards">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Thẻ Học Của Tôi</h2>
@@ -223,16 +240,53 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             <TeacherFlashcards flashcards={flashcards} onFlashcardsChange={loadDashboardData} />
           </TabsContent>
 
+          {/* QUIZZES TAB */}
           <TabsContent value="quizzes">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Bài Kiểm Tra Của Tôi</h2>
             <TeacherQuizzes quizzes={quizzes} onQuizzesChange={loadDashboardData} />
           </TabsContent>
 
-          <TabsContent value="analytics">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Phân Tích Học Tập</h2>
-            <TeacherAnalytics results={results} quizzes={quizzes} />
+          {/* STUDENTS TAB */}
+          <TabsContent value="students">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Tổng Quan Học Sinh</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {students.map((student) => (
+                <Card key={student.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle>{student.full_name || student.email}</CardTitle>
+                    <CardDescription>{student.email}</CardDescription>
+                  </CardHeader>
+
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Tham gia:</span>
+                        <span className="text-gray-900">
+                          {new Date(student.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Lượt làm bài:</span>
+                        <span className="text-gray-900">
+                          {results.filter((r) => r.user_id === student.id).length}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
 
+          {/* ANALYTICS TAB */}
+          <TabsContent value="analytics">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Phân Tích Học Tập</h2>
+            <TeacherAnalytics results={results} students={students} quizzes={quizzes} />
+          </TabsContent>
+
+          {/* CLASSES TAB */}
           <TabsContent value="classes">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Lớp Học Của Tôi</h2>
@@ -248,8 +302,10 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
             {showCreateClassForm && <CreateClassForm onSuccess={handleClassCreated} />}
 
+            {/* nếu đã chọn lớp thì hiển thị chi tiết ở trên danh sách */}
             {selectedClass && (
               <div className="mb-6">
+                {/* ClassDetailsDashboard tự fetch dữ liệu dựa trên selectedClass.id */}
                 <ClassDetailsDashboard cls={selectedClass} onClose={closeClassDetails} />
               </div>
             )}
@@ -267,6 +323,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                       Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
                     </div>
 
+                    {/* Mở chi tiết lớp nội bộ */}
                     <Button
                       onClick={() => openClassDetails(cls)}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
