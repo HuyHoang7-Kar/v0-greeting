@@ -32,26 +32,18 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
     setIsDeleting(id)
 
     try {
-      // Lấy user hiện tại
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      const user = userData?.user
-      if (!user) throw new Error("User not authenticated")
-      if (userError) throw userError
-
-      // 1️⃣ Xóa tất cả kết quả (results) liên quan đến quiz này
+      // 1️⃣ Xóa tất cả kết quả trong bảng results liên quan đến quiz
       const { error: delResultsError } = await supabase
         .from("results")
         .delete()
         .eq("quiz_id", id)
-        .eq("created_by", user.id) // chỉ xóa kết quả do user tạo (nếu cần)
       if (delResultsError) throw delResultsError
 
-      // 2️⃣ Xóa tất cả câu hỏi liên quan (quiz_questions)
+      // 2️⃣ Xóa tất cả câu hỏi liên quan trong quiz_questions
       const { error: delQuestionsError } = await supabase
         .from("quiz_questions")
         .delete()
         .eq("quiz_id", id)
-        .eq("created_by", user.id)
       if (delQuestionsError) throw delQuestionsError
 
       // 3️⃣ Xóa quiz
@@ -59,7 +51,6 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         .from("quizzes")
         .delete()
         .eq("id", id)
-        .eq("created_by", user.id)
       if (delQuizError) throw delQuizError
 
       onQuizzesChange()
@@ -86,7 +77,6 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-gray-600">Create and manage quizzes for your students.</p>
         <Button
@@ -97,7 +87,6 @@ export function TeacherQuizzes({ quizzes, onQuizzesChange }: TeacherQuizzesProps
         </Button>
       </div>
 
-      {/* No quizzes */}
       {quizzes.length === 0 ? (
         <Card className="border-2 border-gray-200 p-12 text-center">
           <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
