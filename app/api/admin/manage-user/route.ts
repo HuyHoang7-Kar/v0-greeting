@@ -9,9 +9,9 @@ const supabaseServer = () =>
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
-  const { action, id, email, full_name, role } = await req.json();
-
   try {
+    const { action, id, email, full_name, role } = await req.json();
+
     if (action === "create") {
       const tempPassword = Math.random().toString(36).slice(-8);
 
@@ -21,10 +21,7 @@ export async function POST(req: NextRequest) {
         email_redirect_to: "https://your-app.vercel.app/login",
       });
 
-      if (error) {
-        console.error("Error creating user:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
@@ -34,7 +31,6 @@ export async function POST(req: NextRequest) {
       });
 
       if (profileError) {
-        console.error("Error inserting profile, rollback user:", profileError);
         await supabase.auth.admin.deleteUser(data.user.id);
         return NextResponse.json({ error: profileError.message }, { status: 500 });
       }
@@ -60,23 +56,17 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
-    console.error("POST /manage-user error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-// GET: fetch danh sách user
 export async function GET(req: NextRequest) {
   const supabase = supabaseServer();
   try {
     const { data, error } = await supabase.from("profiles").select("*");
-    if (error) {
-      console.error("GET profiles error:", error);
-      return NextResponse.json({ users: [], error: error.message }, { status: 500 });
-    }
+    if (error) return NextResponse.json({ users: [], error: error.message }, { status: 500 });
     return NextResponse.json({ users: data ?? [] });
   } catch (err: any) {
-    console.error("GET /manage-user error:", err);
     return NextResponse.json({ users: [], error: err.message }, { status: 500 });
   }
 }

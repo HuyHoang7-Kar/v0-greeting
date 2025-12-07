@@ -12,6 +12,7 @@ interface UserProfile {
 export default function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [newEmail, setNewEmail] = useState("")
   const [newFullName, setNewFullName] = useState("")
@@ -19,12 +20,18 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch("/api/admin/manage-user?action=list")
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(text || "Lỗi khi lấy danh sách user")
+      }
       const data = await res.json()
       setUsers(data.users ?? [])
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
+      setError(err.message)
       setUsers([])
     } finally {
       setLoading(false)
@@ -49,7 +56,7 @@ export default function UserManagement() {
         })
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (!res.ok || data.error) throw new Error(data.error || "Tạo user thất bại")
 
       setNewEmail("")
       setNewFullName("")
@@ -70,7 +77,7 @@ export default function UserManagement() {
         body: JSON.stringify({ action: "delete", id })
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (!res.ok || data.error) throw new Error(data.error || "Xóa user thất bại")
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
@@ -85,7 +92,7 @@ export default function UserManagement() {
         body: JSON.stringify({ action: "updateRole", id, role })
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (!res.ok || data.error) throw new Error(data.error || "Cập nhật role thất bại")
       fetchUsers()
     } catch (err: any) {
       alert("Cập nhật role thất bại: " + err.message)
@@ -93,6 +100,7 @@ export default function UserManagement() {
   }
 
   if (loading) return <div>Loading...</div>
+  if (error) return <div className="text-red-500 mb-2">Error: {error}</div>
 
   return (
     <div>
