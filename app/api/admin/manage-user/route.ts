@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 const supabaseServer = () =>
   createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // chắc chắn là service role key
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
 export async function POST(req: NextRequest) {
@@ -13,21 +13,19 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "create") {
-      // Tạo mật khẩu tạm thời
       const tempPassword = Math.random().toString(36).slice(-8);
 
-      // Tạo user
       const { data, error } = await supabase.auth.admin.createUser({
         email,
         password: tempPassword,
-        email_confirm: true, // tự động confirm email
+        email_redirect_to: "https://your-app.vercel.app/login",
       });
 
       if (error) {
+        console.error("Error creating user:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      // Chèn vào bảng profile
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         email,
@@ -36,18 +34,12 @@ export async function POST(req: NextRequest) {
       });
 
       if (profileError) {
-        // Nếu chèn profile fail thì xóa user vừa tạo
+        console.error("Error inserting profile, rollback user:", profileError);
         await supabase.auth.admin.deleteUser(data.user.id);
-        return NextResponse.json(
-          { error: profileError.message },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: profileError.message }, { status: 500 });
       }
 
-      return NextResponse.json({
-        success: true,
-        tempPassword, // trả mật khẩu tạm để hiển thị cho admin
-      });
+      return NextResponse.json({ success: true, tempPassword });
     }
 
     if (action === "delete") {
@@ -68,14 +60,23 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
+    console.error("POST /manage-user error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
+// GET: fetch danh sách user
 export async function GET(req: NextRequest) {
   const supabase = supabaseServer();
-  const { data, error } = await supabase.from("profiles").select("*");
-  if (error)
-    return NextResponse.json({ users: [], error: error.message }, { status: 500 });
-  return NextResponse.json({ users: data ?? [] });
+  try {
+    const { data, error } = await supabase.from("profiles").select("*");
+    if (error) {
+      console.error("GET profiles error:", error);
+      return NextResponse.json({ users: [], error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ users: data ?? [] });
+  } catch (err: any) {
+    console.error("GET /manage-user error:", err);
+    return NextResponse.json({ users: [], error: err.message }, { status: 500 });
+  }
 }
