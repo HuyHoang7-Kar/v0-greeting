@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -26,14 +26,17 @@ interface Class {
 
 interface CreateQuizProps {
   onSuccess?: () => void
-  classes?: Class[] // danh sách lớp để chọn
 }
 
-export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) {
+export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
+  const supabase = createClient()
+
+  // State chính
   const [step, setStep] = useState<"createQuiz" | "addQuestions">("createQuiz")
   const [quizId, setQuizId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [numQuestions, setNumQuestions] = useState(1)
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion>({
@@ -45,17 +48,30 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
     correct_answer: "A",
     points: 1,
   })
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
+  // Lấy danh sách lớp từ Supabase
+  useEffect(() => {
+    const fetchClasses = async () => {
+      const { data, error } = await supabase
+        .from("classes")
+        .select("id, name")
+        .order("created_at", { ascending: false })
+      if (error) {
+        console.error("Error fetching classes:", error)
+      } else {
+        setClasses(data)
+      }
+    }
+    fetchClasses()
+  }, [])
 
   // 1️⃣ Tạo quiz
   const handleCreateQuiz = async () => {
-    if (!title.trim()) return
-    if (!selectedClassId) {
-      setError("Vui lòng chọn lớp cho quiz")
+    if (!title.trim() || !selectedClassId) {
+      setError("Bạn cần nhập tên quiz và chọn lớp")
       return
     }
     setIsLoading(true)
@@ -69,7 +85,7 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
         title,
         description,
         created_by: user.id,
-        class_id: selectedClassId, // liên kết quiz với lớp
+        class_id: selectedClassId // gắn quiz vào lớp
       }).select().single()
       if (error) throw error
       setQuizId(data.id)
@@ -132,19 +148,14 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
+
           <Textarea
             placeholder="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <Input
-            type="number"
-            min={1}
-            value={numQuestions}
-            onChange={(e) => setNumQuestions(Number(e.target.value))}
-            placeholder="Number of questions"
-          />
 
+          {/* Dropdown chọn lớp */}
           <Select
             value={selectedClassId || ""}
             onValueChange={(v) => setSelectedClassId(v)}
@@ -153,11 +164,19 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
               <SelectValue placeholder="Chọn lớp cho Quiz" />
             </SelectTrigger>
             <SelectContent>
-              {classes?.map(cls => (
+              {classes.map(cls => (
                 <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Input
+            type="number"
+            min={1}
+            value={numQuestions}
+            onChange={(e) => setNumQuestions(Number(e.target.value))}
+            placeholder="Number of questions"
+          />
 
           <Button onClick={handleCreateQuiz} disabled={isLoading} className="mt-2 bg-blue-500 text-white flex items-center gap-2">
             {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -181,7 +200,7 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
       <CardContent className="space-y-2">
         {error && <p className="text-red-600">{error}</p>}
 
-        {/* Hiển thị form nhập chỉ khi chưa đủ số câu hỏi */}
+        {/* Form nhập câu hỏi */}
         {questions.length < numQuestions && (
           <>
             <Textarea
@@ -227,7 +246,7 @@ export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) 
           </>
         )}
 
-        {/* Hiển thị nút lưu khi đủ số câu hỏi */}
+        {/* Nút lưu khi đủ số câu hỏi */}
         {questions.length === numQuestions && (
           <Button
             onClick={handleSaveAllQuestions}
