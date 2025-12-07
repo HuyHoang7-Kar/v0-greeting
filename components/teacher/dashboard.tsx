@@ -217,21 +217,15 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
 
       <Tabs defaultValue="flashcards" className="space-y-6">
         <TabsList className="flex w-full bg-white border-2 border-gray-200">
-          <TabsTrigger value="flashcards" className="flex-1 text-center">
-            <BookOpen className="w-4 h-4 mx-auto" /> Thẻ Học
+          <TabsTrigger value="flashcards" className="flex-1 text-center"><BookOpen className="w-4 h-4 mx-auto" /> Thẻ Học
           </TabsTrigger>
-          <TabsTrigger value="quizzes" className="flex-1 text-center">
-            <Brain className="w-4 h-4 mx-auto" /> Kiểm Tra
+          <TabsTrigger value="quizzes" className="flex-1 text-center"><Brain className="w-4 h-4 mx-auto" /> Kiểm Tra
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex-1 text-center">
-            <BarChart3 className="w-4 h-4 mx-auto" /> Phân Tích
+          <TabsTrigger value="analytics" className="flex-1 text-center"><BarChart3 className="w-4 h-4 mx-auto" /> Phân Tích
           </TabsTrigger>
-          <TabsTrigger value="classes" className="flex-1 text-center">
-            <Users className="w-4 h-4 mx-auto" /> Lớp Học
+          <TabsTrigger value="classes" className="flex-1 text-center"><Users className="w-4 h-4 mx-auto" /> Lớp Học
           </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
+          </TabsList>
 
           {/* FLASHCARDS TAB */}
           <TabsContent value="flashcards">
