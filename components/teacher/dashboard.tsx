@@ -53,40 +53,20 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     try {
       const supabase = createClient()
 
-      const { data: flashcardsData } = await supabase
-        .from("flashcards")
-        .select("*")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false })
+      const [flashcardsData, quizzesData, studentsData, resultsData, classesData] =
+        await Promise.all([
+          supabase.from("flashcards").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("quizzes").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("profiles").select("*").eq("role", "student").order("created_at", { ascending: false }),
+          supabase.from("results").select("*").order("completed_at", { ascending: false }),
+          supabase.from("classes").select("*").eq("teacher_id", user.id).order("created_at", { ascending: false })
+        ])
 
-      const { data: quizzesData } = await supabase
-        .from("quizzes")
-        .select("*")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false })
-
-      const { data: studentsData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("role", "student")
-        .order("created_at", { ascending: false })
-
-      const { data: resultsData } = await supabase
-        .from("results")
-        .select("*")
-        .order("completed_at", { ascending: false })
-
-      const { data: classesData } = await supabase
-        .from("classes")
-        .select("*")
-        .eq("teacher_id", user.id)
-        .order("created_at", { ascending: false })
-
-      setFlashcards(flashcardsData || [])
-      setQuizzes(quizzesData || [])
-      setStudents(studentsData || [])
-      setResults(resultsData || [])
-      setClasses(classesData || [])
+      setFlashcards(flashcardsData.data || [])
+      setQuizzes(quizzesData.data || [])
+      setStudents(studentsData.data || [])
+      setResults(resultsData.data || [])
+      setClasses(classesData.data || [])
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
@@ -110,11 +90,16 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
     loadDashboardData()
   }
 
+  const goToClassDetails = (id: string) => {
+    // ⭐ Điều hướng CHUẨN App Router, không lỗi 404
+    router.push(`/teacher/classes/${id}`)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4" />
           <p className="text-gray-600">Đang tải bảng điều khiển...</p>
         </div>
       </div>
@@ -132,23 +117,23 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
               <p className="text-sm text-gray-600">Bảng Điều Khiển Giáo Viên</p>
             </div>
           </div>
+
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-gray-500" />
               <span className="text-sm text-gray-700">{profile.full_name || profile.email}</span>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                Giáo Viên
-              </Badge>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">Giáo Viên</Badge>
             </div>
+
             <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2 bg-transparent">
-              <LogOut className="w-4 h-4" />
-              Đăng Xuất
+              <LogOut className="w-4 h-4" /> Đăng Xuất
             </Button>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
             <CardContent className="p-6 flex items-center justify-between">
@@ -191,6 +176,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
           </Card>
         </div>
 
+        {/* Create New Content */}
         <div className="mb-8">
           <Card className="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50">
             <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -198,6 +184,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Tạo Nội Dung Mới</h3>
                 <p className="text-gray-600">Thêm thẻ học và bài kiểm tra để giúp học sinh học tập hiệu quả hơn.</p>
               </div>
+
               <Button
                 onClick={() => setShowCreateFlashcardForm(!showCreateFlashcardForm)}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-2"
@@ -215,6 +202,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
           </div>
         )}
 
+        {/* TABS */}
         <Tabs defaultValue="flashcards" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
             <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
@@ -224,6 +212,7 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
+          {/* FLASHCARDS TAB */}
           <TabsContent value="flashcards">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Thẻ Học Của Tôi</h2>
@@ -234,16 +223,20 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                 <Plus className="w-4 h-4" /> Tạo Mới
               </Button>
             </div>
+
             <TeacherFlashcards flashcards={flashcards} onFlashcardsChange={loadDashboardData} />
           </TabsContent>
 
+          {/* QUIZZES TAB */}
           <TabsContent value="quizzes">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Bài Kiểm Tra Của Tôi</h2>
             <TeacherQuizzes quizzes={quizzes} onQuizzesChange={loadDashboardData} />
           </TabsContent>
 
+          {/* STUDENTS TAB */}
           <TabsContent value="students">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Tổng Quan Học Sinh</h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {students.map((student) => (
                 <Card key={student.id} className="border-2 border-green-200 hover:shadow-lg transition-shadow">
@@ -251,15 +244,21 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                     <CardTitle>{student.full_name || student.email}</CardTitle>
                     <CardDescription>{student.email}</CardDescription>
                   </CardHeader>
+
                   <CardContent>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Tham gia:</span>
-                        <span className="text-gray-900">{new Date(student.created_at).toLocaleDateString()}</span>
+                        <span className="text-gray-900">
+                          {new Date(student.created_at).toLocaleDateString()}
+                        </span>
                       </div>
+
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Lượt làm bài:</span>
-                        <span className="text-gray-900">{results.filter((r) => r.user_id === student.id).length}</span>
+                        <span className="text-gray-900">
+                          {results.filter((r) => r.user_id === student.id).length}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -268,19 +267,23 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
             </div>
           </TabsContent>
 
+          {/* ANALYTICS TAB */}
           <TabsContent value="analytics">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Phân Tích Học Tập</h2>
             <TeacherAnalytics results={results} students={students} quizzes={quizzes} />
           </TabsContent>
 
+          {/* CLASSES TAB */}
           <TabsContent value="classes">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Lớp Học Của Tôi</h2>
+
               <Button
                 onClick={() => setShowCreateClassForm(!showCreateClassForm)}
                 className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
               >
-                <Plus className="w-4 h-4" /> {showCreateClassForm ? "Hủy" : "Tạo Lớp"}
+                <Plus className="w-4 h-4" />
+                {showCreateClassForm ? "Hủy" : "Tạo Lớp"}
               </Button>
             </div>
 
@@ -293,14 +296,15 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
                     <CardTitle>{cls.name}</CardTitle>
                     <CardDescription>{cls.description}</CardDescription>
                   </CardHeader>
+
                   <CardContent className="space-y-4">
                     <div className="text-sm text-gray-600">
                       Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
                     </div>
 
-                    {/* ⭐ NÚT XEM CHI TIẾT */}
+                    {/* ⭐ Điều hướng LỚP HỌC */}
                     <Button
-                      onClick={() => router.push(`/teacher/classes/${cls.id}`)}
+                      onClick={() => goToClassDetails(cls.id)}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       Xem Chi Tiết
