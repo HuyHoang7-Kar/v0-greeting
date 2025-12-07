@@ -1,72 +1,78 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-
-const supabaseServer = () =>
-  createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+// /app/api/admin/manage-user/route.ts
+import { NextRequest, NextResponse } from "next/server"
+import { supabaseServer } from "@/lib/supabase/client"  // import từ file bạn vừa viết
 
 export async function POST(req: NextRequest) {
-  const supabase = supabaseServer();
+  const supabase = supabaseServer()
   try {
-    const { action, id, email, full_name, role } = await req.json();
+    const { action, id, email, full_name, role } = await req.json()
 
     if (action === "create") {
-      const tempPassword = Math.random().toString(36).slice(-8);
+      if (!email || !full_name || !role) {
+        return NextResponse.json({ error: "Thiếu thông tin user" }, { status: 400 })
+      }
 
-      const { data, error } = await supabase.auth.admin.createUser({
+      const tempPassword = Math.random().toString(36).slice(-8)
+
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email,
         password: tempPassword,
         email_redirect_to: "https://your-app.vercel.app/login",
-      });
+        user_metadata: { full_name, role }
+      })
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (authError) return NextResponse.json({ error: authError.message }, { status: 500 })
 
       const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
+        id: authData.user.id,
         email,
         full_name,
-        role,
-      });
+        role
+      })
 
       if (profileError) {
-        await supabase.auth.admin.deleteUser(data.user.id);
-        return NextResponse.json({ error: profileError.message }, { status: 500 });
+        await supabase.auth.admin.deleteUser(authData.user.id)
+        return NextResponse.json({ error: profileError.message }, { status: 500 })
       }
 
-      return NextResponse.json({ success: true, tempPassword });
+      return NextResponse.json({ success: true })
     }
 
     if (action === "delete") {
-      await supabase.from("class_members").delete().eq("user_id", id);
-      await supabase.from("game_plays").delete().eq("user_id", id);
-      await supabase.from("game_scores").delete().eq("user_id", id);
-      await supabase.from("notes").delete().eq("user_id", id);
-      await supabase.from("profiles").delete().eq("id", id);
-      await supabase.auth.admin.deleteUser(id);
-      return NextResponse.json({ success: true });
+      if (!id) return NextResponse.json({ error: "Thiếu id user" }, { status: 400 })
+
+      await supabase.from("class_members").delete().eq("user_id", id)
+      await supabase.from("game_plays").delete().eq("user_id", id)
+      await supabase.from("game_scores").delete().eq("user_id", id)
+      await supabase.from("notes").delete().eq("user_id", id)
+      await supabase.from("profiles").delete().eq("id", id)
+      await supabase.auth.admin.deleteUser(id)
+
+      return NextResponse.json({ success: true })
     }
 
     if (action === "updateRole") {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true });
+      if (!id || !role) return NextResponse.json({ error: "Thiếu thông tin" }, { status: 400 })
+
+      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      return NextResponse.json({ success: true })
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Lỗi server" }, { status: 500 })
   }
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = supabaseServer();
+  const supabase = supabaseServer()
   try {
-    const { data, error } = await supabase.from("profiles").select("*");
-    if (error) return NextResponse.json({ users: [], error: error.message }, { status: 500 });
-    return NextResponse.json({ users: data ?? [] });
+    const { data, error } = await supabase.from("profiles").select("*")
+    if (error) return NextResponse.json({ users: [], error: error.message }, { status: 500 })
+    return NextResponse.json({ users: data ?? [] })
   } catch (err: any) {
-    return NextResponse.json({ users: [], error: err.message }, { status: 500 });
+    return NextResponse.json({ users: [], error: err.message || "Lỗi server" }, { status: 500 })
   }
 }
