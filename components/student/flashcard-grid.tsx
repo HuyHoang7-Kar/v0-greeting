@@ -125,13 +125,13 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
-  // Component flashcard kiểu nghệ thuật lớn
+  // Component flashcard lớn, đẹp
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
 
     return (
       <div
-        className="w-80 h-56 perspective-1000 cursor-pointer"
+        className="w-96 h-64 perspective-1000 cursor-pointer"
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div
@@ -145,44 +145,45 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div
             className="absolute inset-0 rounded-xl border"
             style={{
-              background: "linear-gradient(145deg, #fefcf8, #fefaf5)",
-              border: "1px solid rgba(255, 215, 180, 0.5)",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+              background: "linear-gradient(145deg, #fffaf3, #fef7ee)", // màu ngọc sữa
+              border: "2px solid rgba(255, 215, 180, 0.7)", // foil vàng nhẹ
+              boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
               backfaceVisibility: "hidden",
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
-              padding: "1.5rem",
+              padding: "2rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
               position: "relative",
             }}
           >
+            {/* watercolor góc trên */}
             <div
               style={{
                 position: "absolute",
                 top: "0.5rem",
                 right: "0.5rem",
-                width: "50px",
-                height: "50px",
+                width: "60px",
+                height: "60px",
                 background: "radial-gradient(circle at center, #a0c4ff55, #bdb2ff33)",
                 borderRadius: "50%",
               }}
             />
-            <h3 className="text-center text-xl font-semibold">{flashcard.question}</h3>
+            <h3 className="text-center text-2xl font-bold">{flashcard.question}</h3>
             <div
               style={{
                 position: "absolute",
                 top: "0.5rem",
                 left: "0.5rem",
-                fontSize: "0.85rem",
+                fontSize: "1rem",
                 color: "rgba(255, 215, 180, 0.9)",
               }}
             >
               ✒️
             </div>
-            <p className="mt-auto text-sm text-gray-500 text-center">Click để xem đáp án</p>
+            <p className="mt-auto text-base text-gray-500 text-center">Click để xem đáp án</p>
           </div>
 
           {/* Back */}
@@ -190,21 +191,21 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
             className="absolute inset-0 rounded-xl border rotate-y-180"
             style={{
               background: "#fffdf8",
-              border: "1px solid rgba(255, 215, 180, 0.5)",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+              border: "2px solid rgba(255, 215, 180, 0.7)",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "flex-start",
-              padding: "1.5rem",
+              padding: "2rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
               position: "relative",
             }}
           >
-            <h3 className="text-center text-xl font-semibold mb-2">Đáp án</h3>
-            <ul className="text-sm text-gray-700 list-inside" style={{ listStyleType: "circle" }}>
+            <h3 className="text-center text-2xl font-bold mb-3">Đáp án</h3>
+            <ul className="text-base text-gray-700 list-inside" style={{ listStyleType: "circle" }}>
               {flashcard.answer.split("\n").map((line, idx) => (
                 <li key={idx} className="mb-1">{line}</li>
               ))}
@@ -212,10 +213,10 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
             <div
               style={{
                 position: "absolute",
-                bottom: "0.5rem",
+                bottom: "1rem",
                 left: "10%",
                 width: "80%",
-                height: "2px",
+                height: "3px",
                 background: "linear-gradient(90deg, #a0c4ff, #bdb2ff)",
                 borderRadius: "1px",
               }}
@@ -227,7 +228,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 bg-[#f5f3f0] p-8 min-h-screen">
       <Button
         onClick={() => setShowForm(!showForm)}
         className="bg-yellow-500 hover:bg-yellow-600 text-white"
@@ -249,7 +250,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                   onChange={(e) => setQuestion(e.target.value)}
                   required
                   placeholder="Nhập câu hỏi"
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-base"
                 />
               </div>
 
@@ -260,7 +261,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                   onChange={(e) => setAnswer(e.target.value)}
                   required
                   placeholder="Nhập câu trả lời"
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-base"
                 />
               </div>
 
@@ -269,7 +270,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-base"
                 >
                   <option value="vocabulary">Từ vựng</option>
                   <option value="grammar">Ngữ pháp</option>
@@ -284,7 +285,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
                   <select
                     value={selectedClassId || ""}
                     onChange={(e) => setSelectedClassId(e.target.value || null)}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border rounded text-base"
                   >
                     <option value="">Flashcard riêng</option>
                     {classes.map((cls) => (
@@ -316,8 +317,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         if (flashcardsOfClass.length === 0) return null
         return (
           <div key={cls.id}>
-            <h2 className="text-2xl font-bold mb-4">{cls.name}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+            <h2 className="text-3xl font-bold mb-6">{cls.name}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-10">
               {flashcardsOfClass.map((f) => (
                 <FlashcardItem key={f.id} flashcard={f} />
               ))}
@@ -329,8 +330,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       {/* Flashcards riêng của học sinh */}
       {flashcards.filter((f) => f.created_by === userId && !f.class_id).length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Flashcards riêng của bạn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+          <h2 className="text-3xl font-bold mb-6">Flashcards riêng của bạn</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-10">
             {flashcards
               .filter((f) => f.created_by === userId && !f.class_id)
               .map((f) => (
