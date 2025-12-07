@@ -125,17 +125,17 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
 
   if (loading) return <p>Đang tải dữ liệu...</p>
 
-  // Component flashcard kiểu nghệ thuật
+  // Component flashcard kiểu nghệ thuật lớn
   const FlashcardItem = ({ flashcard }: { flashcard: Flashcard }) => {
     const [isFlipped, setIsFlipped] = useState(false)
 
     return (
       <div
-        className="w-64 h-40 perspective-1000 cursor-pointer"
+        className="w-80 h-56 perspective-1000 cursor-pointer"
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div
-          className={`relative w-full h-full transition-transform duration-700 transform-style-preserve-3d shadow-lg rounded-xl`}
+          className="relative w-full h-full transition-transform duration-700 transform-style-preserve-3d shadow-lg rounded-xl"
           style={{
             transformStyle: "preserve-3d",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -145,46 +145,44 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div
             className="absolute inset-0 rounded-xl border"
             style={{
-              background: "linear-gradient(145deg, #fefcf8, #fefaf5)", // nền trắng ngọc
-              border: "1px solid rgba(255, 215, 180, 0.5)", // viền vàng champagne
-              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+              background: "linear-gradient(145deg, #fefcf8, #fefaf5)",
+              border: "1px solid rgba(255, 215, 180, 0.5)",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
               backfaceVisibility: "hidden",
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
-              padding: "1rem",
+              padding: "1.5rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
               position: "relative",
             }}
           >
-            {/* Watercolor nhẹ góc trên */}
             <div
               style={{
                 position: "absolute",
                 top: "0.5rem",
                 right: "0.5rem",
-                width: "40px",
-                height: "40px",
+                width: "50px",
+                height: "50px",
                 background: "radial-gradient(circle at center, #a0c4ff55, #bdb2ff33)",
                 borderRadius: "50%",
               }}
             />
-            <h3 className="text-center text-lg font-semibold">{flashcard.question}</h3>
-            {/* Icon nhỏ ánh kim */}
+            <h3 className="text-center text-xl font-semibold">{flashcard.question}</h3>
             <div
               style={{
                 position: "absolute",
                 top: "0.5rem",
                 left: "0.5rem",
-                fontSize: "0.75rem",
-                color: "rgba(255, 215, 180, 0.9)", // vàng ánh kim
+                fontSize: "0.85rem",
+                color: "rgba(255, 215, 180, 0.9)",
               }}
             >
               ✒️
             </div>
-            <p className="mt-auto text-xs text-gray-500 text-center">Click để xem đáp án</p>
+            <p className="mt-auto text-sm text-gray-500 text-center">Click để xem đáp án</p>
           </div>
 
           {/* Back */}
@@ -193,27 +191,24 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
             style={{
               background: "#fffdf8",
               border: "1px solid rgba(255, 215, 180, 0.5)",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "flex-start",
-              padding: "1rem",
+              padding: "1.5rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
               position: "relative",
             }}
           >
-            <h3 className="text-center text-lg font-semibold mb-2">Đáp án</h3>
+            <h3 className="text-center text-xl font-semibold mb-2">Đáp án</h3>
             <ul className="text-sm text-gray-700 list-inside" style={{ listStyleType: "circle" }}>
               {flashcard.answer.split("\n").map((line, idx) => (
-                <li key={idx} className="mb-1">
-                  {line}
-                </li>
+                <li key={idx} className="mb-1">{line}</li>
               ))}
             </ul>
-            {/* Đường kẻ pastel cuối thẻ */}
             <div
               style={{
                 position: "absolute",
@@ -321,8 +316,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         if (flashcardsOfClass.length === 0) return null
         return (
           <div key={cls.id}>
-            <h2 className="text-xl font-bold mb-4">{cls.name}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <h2 className="text-2xl font-bold mb-4">{cls.name}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
               {flashcardsOfClass.map((f) => (
                 <FlashcardItem key={f.id} flashcard={f} />
               ))}
@@ -334,8 +329,8 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
       {/* Flashcards riêng của học sinh */}
       {flashcards.filter((f) => f.created_by === userId && !f.class_id).length > 0 && (
         <div>
-          <h2 className="text-xl font-bold mb-4">Flashcards riêng của bạn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <h2 className="text-2xl font-bold mb-4">Flashcards riêng của bạn</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {flashcards
               .filter((f) => f.created_by === userId && !f.class_id)
               .map((f) => (
