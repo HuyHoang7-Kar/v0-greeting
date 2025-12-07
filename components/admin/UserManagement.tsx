@@ -56,6 +56,11 @@ export default function UserManagement() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
+      // Hiển thị mật khẩu tạm thời và nhắc user kiểm tra mail
+      alert(
+        `Tạo user thành công!\nEmail: ${newEmail}\nMật khẩu tạm: ${data.password}\nVui lòng kiểm tra email để xác nhận tài khoản.`
+      )
+
       setNewEmail("")
       setNewFullName("")
       setNewRole("student")
