@@ -1,6 +1,6 @@
-'use client'
-
-import { useEffect, useState } from "react"
+"use client"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 interface UserProfile {
   id: string
@@ -10,98 +10,61 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
+  const supabase = createClient()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
-
   const [newEmail, setNewEmail] = useState("")
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
-  // Lấy danh sách user từ database thông qua API server
   const fetchUsers = async () => {
     setLoading(true)
+    const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
+    if (error) console.error(error)
+    else setUsers(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { fetchUsers() }, [])
+
+  const handleAction = async (action: string, payload: any) => {
     try {
       const res = await fetch("/api/admin/manage-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "fetch" }),
+        body: JSON.stringify({ action, ...payload })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setUsers(data.users ?? [])
+      fetchUsers()
     } catch (err: any) {
-      console.error("Lấy danh sách user thất bại:", err.message)
-      setUsers([])
-    } finally {
-      setLoading(false)
+      alert(err.message)
     }
   }
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  // Thêm user
-  const handleAddUser = async () => {
+  const handleAddUser = () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
-    try {
-      const res = await fetch("/api/admin/manage-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", email: newEmail, full_name: newFullName, role: newRole }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-
-      setNewEmail("")
-      setNewFullName("")
-      setNewRole("student")
-      fetchUsers()
-    } catch (err: any) {
-      alert("Thêm user thất bại: " + err.message)
-    }
+    handleAction("create", { email: newEmail, full_name: newFullName, role: newRole })
+    setNewEmail("")
+    setNewFullName("")
+    setNewRole("student")
   }
 
-  // Xóa user
-  const handleDeleteUser = async (id: string) => {
+  const handleDeleteUser = (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
-    try {
-      const res = await fetch("/api/admin/manage-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      fetchUsers()
-    } catch (err: any) {
-      alert("Xóa thất bại: " + err.message)
-    }
+    handleAction("delete", { id })
   }
 
-  // Cập nhật role
-  const handleUpdateRole = async (id: string, role: string) => {
-    try {
-      const res = await fetch("/api/admin/manage-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateRole", id, role }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      fetchUsers()
-    } catch (err: any) {
-      alert("Cập nhật role thất bại: " + err.message)
-    }
+  const handleUpdateRole = (id: string, role: string) => {
+    handleAction("updateRole", { id, role })
   }
 
   if (loading) return <div>Loading...</div>
 
   return (
-    <div className="p-4">
+    <div>
       <h2 className="text-lg font-semibold mb-4">Danh sách người dùng</h2>
 
-      {/* Form thêm user mới */}
       <div className="mb-6 flex gap-2">
         <input
           type="email"
@@ -126,15 +89,11 @@ export default function UserManagement() {
           <option value="teacher">Teacher</option>
           <option value="admin">Admin</option>
         </select>
-        <button
-          onClick={handleAddUser}
-          className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700"
-        >
+        <button onClick={handleAddUser} className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700">
           Thêm user
         </button>
       </div>
 
-      {/* Bảng user */}
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100">
@@ -145,26 +104,21 @@ export default function UserManagement() {
           </tr>
         </thead>
         <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td className="border px-3 py-1">{user.email}</td>
-              <td className="border px-3 py-1">{user.full_name}</td>
+          {users.map(u => (
+            <tr key={u.id}>
+              <td className="border px-3 py-1">{u.email}</td>
+              <td className="border px-3 py-1">{u.full_name}</td>
               <td className="border px-3 py-1">
-                <select
-                  value={user.role}
-                  onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                  className="border px-2 py-1 rounded"
-                >
+                <select value={u.role} onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                  className="border px-2 py-1 rounded">
                   <option value="student">Student</option>
                   <option value="teacher">Teacher</option>
                   <option value="admin">Admin</option>
                 </select>
               </td>
               <td className="border px-3 py-1">
-                <button
-                  onClick={() => handleDeleteUser(user.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                >
+                <button onClick={() => handleDeleteUser(u.id)}
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
                   Xóa
                 </button>
               </td>
