@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/client"
 
 interface UserProfile {
   id: string
@@ -11,7 +11,7 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -21,10 +21,16 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     setLoading(true)
-    const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
-    if (error) console.error("Error fetching users:", error)
-    else setUsers(data ?? [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
+      if (error) console.error("Error fetching users:", error)
+      else setUsers(data ?? [])
+    } catch (err) {
+      console.error(err)
+      setUsers([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -34,6 +40,7 @@ export default function UserManagement() {
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
     try {
+      // Tạo user thông qua API (Supabase client không trực tiếp tạo user mới bằng email/password)
       const res = await fetch("/api/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,14 +61,8 @@ export default function UserManagement() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
-      const res = await fetch("/api/delete-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      const data = await res.json(); // giờ chắc chắn có JSON
-      if (data.error) throw new Error(data.error)
-
+      const { error } = await supabase.from("profiles").delete().eq("id", id)
+      if (error) throw error
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
@@ -69,9 +70,13 @@ export default function UserManagement() {
   }
 
   const handleUpdateRole = async (id: string, role: string) => {
-    const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
-    if (error) alert("Cập nhật thất bại: " + error.message)
-    else fetchUsers()
+    try {
+      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
+      if (error) throw error
+      fetchUsers()
+    } catch (err: any) {
+      alert("Cập nhật role thất bại: " + err.message)
+    }
   }
 
   if (loading) return <div>Loading...</div>
