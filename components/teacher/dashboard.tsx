@@ -1,30 +1,31 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
-
 import { CreateFlashcardForm } from "@/components/teacher/create-flashcard-form"
 import { TeacherFlashcards } from "@/components/teacher/flashcards"
 import { TeacherQuizzes } from "@/components/teacher/quizzes"
 import { TeacherAnalytics } from "@/components/teacher/analytics"
+import { BookOpen, Brain, Users, BarChart3, LogOut, User, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { CreateClassForm } from "@/components/teacher/CreateClassForm"
+import dynamic from "next/dynamic"
 
-// dynamic import client-only component (avoid SSR mismatch)
-const ClassDetailsDashboard = dynamic(() => import("./ClassDetailsDashboard"), { ssr: false })
+// import ClassDetailsDashboard dynamically to avoid SSR issues
+const ClassDetailsDashboard = dynamic(
+  () => import("./ClassDetailsDashboard").then((mod) => mod.default || mod),
+  { ssr: false }
+)
 
 interface Profile {
   id: string
-  email?: string
-  full_name?: string
-  role?: string
+  email: string
+  full_name: string
+  role: string
 }
 
 interface TeacherDashboardProps {
@@ -40,68 +41,52 @@ interface Class {
   created_at: string
 }
 
-export default function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
-  const router = useRouter()
-  const supabase = createClient()
-
+export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [classes, setClasses] = useState<Class[]>([])
-
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateFlashcardForm, setShowCreateFlashcardForm] = useState(false)
   const [showCreateClassForm, setShowCreateClassForm] = useState(false)
   const [selectedClass, setSelectedClass] = useState<Class | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
-    if (!user || !user.id) {
-      setIsLoading(false)
-      return
-    }
     loadDashboardData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [])
 
   const loadDashboardData = async () => {
-    setIsLoading(true)
     try {
-      const [
-        flashcardsData,
-        quizzesData,
-        studentsData,
-        resultsData,
-        classesData
-      ] = await Promise.all([
-        supabase.from("flashcards").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
-        supabase.from("quizzes").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
-        supabase.from("profiles").select("*").eq("role", "student").order("created_at", { ascending: false }),
-        supabase.from("results").select("*").order("completed_at", { ascending: false }),
-        supabase.from("classes").select("*").eq("teacher_id", user.id).order("created_at", { ascending: false })
-      ])
+      const supabase = createClient()
 
-      setFlashcards(flashcardsData?.data ?? [])
-      setQuizzes(quizzesData?.data ?? [])
-      setStudents(studentsData?.data ?? [])
-      setResults(resultsData?.data ?? [])
-      setClasses(classesData?.data ?? [])
+      const [flashcardsData, quizzesData, studentsData, resultsData, classesData] =
+        await Promise.all([
+          supabase.from("flashcards").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("quizzes").select("*").eq("created_by", user.id).order("created_at", { ascending: false }),
+          supabase.from("profiles").select("*").eq("role", "student").order("created_at", { ascending: false }),
+          supabase.from("results").select("*").order("completed_at", { ascending: false }),
+          supabase.from("classes").select("*").eq("teacher_id", user.id).order("created_at", { ascending: false })
+        ])
+
+      setFlashcards(flashcardsData.data || [])
+      setQuizzes(quizzesData.data || [])
+      setStudents(studentsData.data || [])
+      setResults(resultsData.data || [])
+      setClasses(classesData.data || [])
     } catch (error) {
       console.error("Error loading dashboard data:", error)
-      // optional: show toast / UI indicator
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut()
-    } catch (e) {
-      console.error("Sign out error", e)
-    } finally {
-      router.push("/")
-    }
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
   const handleFlashcardCreated = () => {
@@ -114,8 +99,14 @@ export default function TeacherDashboard({ user, profile }: TeacherDashboardProp
     loadDashboardData()
   }
 
-  const openClassDetails = (cls: Class) => setSelectedClass(cls)
-  const closeClassDetails = () => setSelectedClass(null)
+  // MỞ chi tiết lớp nội bộ (không chuyển route)
+  const openClassDetails = (cls: Class) => {
+    setSelectedClass(cls)
+  }
+
+  const closeClassDetails = () => {
+    setSelectedClass(null)
+  }
 
   if (isLoading) {
     return (
@@ -143,7 +134,7 @@ export default function TeacherDashboard({ user, profile }: TeacherDashboardProp
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-700">{profile?.full_name || profile?.email}</span>
+              <span className="text-sm text-gray-700">{profile.full_name || profile.email}</span>
               <Badge variant="secondary" className="bg-green-100 text-green-800">Giáo Viên</Badge>
             </div>
 
@@ -272,7 +263,7 @@ export default function TeacherDashboard({ user, profile }: TeacherDashboardProp
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Tham gia:</span>
                         <span className="text-gray-900">
-                          {student.created_at ? new Date(student.created_at).toLocaleDateString() : "-"}
+                          {new Date(student.created_at).toLocaleDateString()}
                         </span>
                       </div>
 
@@ -314,6 +305,7 @@ export default function TeacherDashboard({ user, profile }: TeacherDashboardProp
             {/* nếu đã chọn lớp thì hiển thị chi tiết ở trên danh sách */}
             {selectedClass && (
               <div className="mb-6">
+                {/* ClassDetailsDashboard tự fetch dữ liệu dựa trên selectedClass.id */}
                 <ClassDetailsDashboard cls={selectedClass} onClose={closeClassDetails} />
               </div>
             )}
@@ -328,9 +320,10 @@ export default function TeacherDashboard({ user, profile }: TeacherDashboardProp
 
                   <CardContent className="space-y-4">
                     <div className="text-sm text-gray-600">
-                      Ngày tạo: {cls.created_at ? new Date(cls.created_at).toLocaleDateString() : "-"}
+                      Ngày tạo: {new Date(cls.created_at).toLocaleDateString()}
                     </div>
 
+                    {/* Mở chi tiết lớp nội bộ */}
                     <Button
                       onClick={() => openClassDetails(cls)}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white"
