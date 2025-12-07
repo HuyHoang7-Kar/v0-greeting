@@ -134,7 +134,7 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div
-          className="relative w-full h-full transition-transform duration-700 transform-style-preserve-3d shadow-lg rounded-xl"
+          className="relative w-full h-full transition-transform duration-700 transform-style-preserve-3d shadow-xl rounded-xl"
           style={{
             transformStyle: "preserve-3d",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -144,9 +144,9 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div
             className="absolute inset-0 rounded-xl border"
             style={{
-              background: "linear-gradient(145deg, #fffaf3, #fef7ee)",
-              border: "2px solid rgba(255, 215, 180, 0.7)",
-              boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+              background: "#fffdf5", // trắng ngà, sáng nổi bật
+              border: "2px solid rgba(255, 215, 180, 0.8)", // foil vàng nhẹ
+              boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
               backfaceVisibility: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -166,14 +166,15 @@ export default function StudentFlashcards({ userId }: StudentFlashcardsProps) {
           <div
             className="absolute inset-0 rounded-xl border rotate-y-180 flex flex-col justify-center items-center"
             style={{
-              background: "#fffdf8",
-              border: "2px solid rgba(255, 215, 180, 0.7)",
-              boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+              background: "#fffdf5",
+              border: "2px solid rgba(255, 215, 180, 0.8)",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
               padding: "2rem",
               fontFamily: "'Merriweather', serif",
               color: "#333",
+              textAlign: "center",
             }}
           >
             <h3 className="text-center text-3xl font-bold mb-4">ĐÁP ÁN</h3>
