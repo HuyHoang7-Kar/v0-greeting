@@ -19,11 +19,17 @@ interface QuizQuestion {
   points: number
 }
 
-interface CreateQuizProps {
-  onSuccess?: () => void
+interface Class {
+  id: string
+  name: string
 }
 
-export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
+interface CreateQuizProps {
+  onSuccess?: () => void
+  classes?: Class[] // danh sách lớp để chọn
+}
+
+export default function CreateQuizForm({ onSuccess, classes }: CreateQuizProps) {
   const [step, setStep] = useState<"createQuiz" | "addQuestions">("createQuiz")
   const [quizId, setQuizId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
@@ -39,6 +45,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
     correct_answer: "A",
     points: 1,
   })
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,6 +54,10 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
   // 1️⃣ Tạo quiz
   const handleCreateQuiz = async () => {
     if (!title.trim()) return
+    if (!selectedClassId) {
+      setError("Vui lòng chọn lớp cho quiz")
+      return
+    }
     setIsLoading(true)
     setError(null)
     try {
@@ -58,6 +69,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
         title,
         description,
         created_by: user.id,
+        class_id: selectedClassId, // liên kết quiz với lớp
       }).select().single()
       if (error) throw error
       setQuizId(data.id)
@@ -114,6 +126,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
         </CardHeader>
         <CardContent className="space-y-2">
           {error && <p className="text-red-600">{error}</p>}
+
           <Input
             placeholder="Quiz Title"
             value={title}
@@ -131,6 +144,21 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizProps) {
             onChange={(e) => setNumQuestions(Number(e.target.value))}
             placeholder="Number of questions"
           />
+
+          <Select
+            value={selectedClassId || ""}
+            onValueChange={(v) => setSelectedClassId(v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Chọn lớp cho Quiz" />
+            </SelectTrigger>
+            <SelectContent>
+              {classes?.map(cls => (
+                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button onClick={handleCreateQuiz} disabled={isLoading} className="mt-2 bg-blue-500 text-white flex items-center gap-2">
             {isLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Plus className="w-4 h-4" />}
             Create Quiz
