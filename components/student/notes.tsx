@@ -23,9 +23,9 @@ export function StudentNotes() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newNoteContent, setNewNoteContent] = useState("")
   const [editNoteContent, setEditNoteContent] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  // Fetch notes của user hiện tại
+  // Fetch notes
   const fetchNotes = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser()
@@ -52,8 +52,7 @@ export function StudentNotes() {
   // Create note
   const handleCreateNote = async () => {
     if (!newNoteContent.trim()) return
-    setIsLoading(true)
-
+    setLoading(true)
     try {
       const { data: userData } = await supabase.auth.getUser()
       const user = userData?.user
@@ -68,19 +67,18 @@ export function StudentNotes() {
 
       setNewNoteContent("")
       setIsCreating(false)
-      fetchNotes() // reload notes
+      fetchNotes()
     } catch (err) {
       console.error("❌ Error creating note:", err)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   // Update note
   const handleUpdateNote = async (id: string) => {
     if (!editNoteContent.trim()) return
-    setIsLoading(true)
-
+    setLoading(true)
     try {
       const { error } = await supabase
         .from("notes")
@@ -91,21 +89,19 @@ export function StudentNotes() {
         .eq("id", id)
 
       if (error) throw error
-
       setEditingId(null)
       fetchNotes()
     } catch (err) {
       console.error("❌ Error updating note:", err)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   // Delete note
   const handleDeleteNote = async (id: string) => {
     if (!confirm("Are you sure you want to delete this note?")) return
-    setIsLoading(true)
-
+    setLoading(true)
     try {
       const { error } = await supabase.from("notes").delete().eq("id", id)
       if (error) throw error
@@ -113,20 +109,15 @@ export function StudentNotes() {
     } catch (err) {
       console.error("❌ Error deleting note:", err)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }
-
-  const startEditing = (note: Note) => {
-    setEditingId(note.id)
-    setEditNoteContent(note.content)
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <p className="text-gray-600">Keep track of important study notes.</p>
+        <p className="text-gray-600">Keep track of your study notes.</p>
         <Button
           onClick={() => setIsCreating(true)}
           className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
@@ -136,9 +127,9 @@ export function StudentNotes() {
         </Button>
       </div>
 
-      {/* Create Note Form */}
+      {/* Create Note */}
       {isCreating && (
-        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
+        <Card className="border-2 border-green-200 bg-green-50">
           <CardHeader className="flex justify-between items-center">
             <p>Create New Note</p>
             <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)}>
@@ -147,19 +138,19 @@ export function StudentNotes() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
-              placeholder="Write your note here..."
+              placeholder="Write your note..."
               value={newNoteContent}
               onChange={(e) => setNewNoteContent(e.target.value)}
-              className="min-h-32"
+              className="min-h-24"
             />
             <div className="flex gap-2">
               <Button
                 onClick={handleCreateNote}
-                disabled={isLoading}
-                className="bg-green-500 hover:bg-green-600 text-white"
+                disabled={loading}
+                className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
               >
-                <Save className="w-4 h-4 mr-2" />
-                Save Note
+                <Save className="w-4 h-4" />
+                Save
               </Button>
               <Button variant="outline" onClick={() => setIsCreating(false)}>
                 Cancel
@@ -182,7 +173,7 @@ export function StudentNotes() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {notes.map((note) => (
             <Card key={note.id} className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3 flex justify-between items-start">
+              <CardHeader className="flex justify-between items-start">
                 {editingId === note.id ? (
                   <Textarea
                     value={editNoteContent}
@@ -190,12 +181,14 @@ export function StudentNotes() {
                     className="min-h-24 w-full"
                   />
                 ) : (
-                  <p className="text-gray-900">{note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}</p>
+                  <p className="text-gray-900 break-words">
+                    {note.content.length > 150 ? `${note.content.substring(0, 150)}...` : note.content}
+                  </p>
                 )}
                 <div className="flex gap-1">
                   {editingId === note.id ? (
                     <>
-                      <Button size="sm" variant="ghost" onClick={() => handleUpdateNote(note.id)} disabled={isLoading}>
+                      <Button size="sm" variant="ghost" onClick={() => handleUpdateNote(note.id)} disabled={loading}>
                         <Save className="w-4 h-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
@@ -204,10 +197,10 @@ export function StudentNotes() {
                     </>
                   ) : (
                     <>
-                      <Button size="sm" variant="ghost" onClick={() => startEditing(note)}>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingId(note.id); setEditNoteContent(note.content); }}>
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDeleteNote(note.id)} disabled={isLoading}>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteNote(note.id)} disabled={loading}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </>
@@ -215,7 +208,7 @@ export function StudentNotes() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-gray-500 mt-3">
+                <p className="text-xs text-gray-500 mt-2">
                   Updated {new Date(note.updated_at).toLocaleDateString()}
                 </p>
               </CardContent>
