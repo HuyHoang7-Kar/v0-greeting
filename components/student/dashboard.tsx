@@ -38,13 +38,13 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [classes, setClasses] = useState<Class[]>([])
-  const [myClasses, setMyClasses] = useState<string[]>([]) // IDs của lớp đã tham gia
+  const [myClasses, setMyClasses] = useState<string[]>([])
   const [userPoints, setUserPoints] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [studyMode, setStudyMode] = useState(false)
   const router = useRouter()
 
-  const supabase = createClient()
+  const supabase = createClient() // dùng client giống teacher
 
   useEffect(() => {
     loadDashboardData()
@@ -64,9 +64,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
         .order("completed_at", { ascending: false })
       const { data: pointsData } = await supabase.from("user_totals").select("*").eq("user_id", user.id).single()
 
-      // Lấy danh sách lớp
       const { data: classesData } = await supabase.from("classes").select("*").order("created_at", { ascending: false })
-      // Lấy lớp mà học sinh đã tham gia
       const { data: myClassesData } = await supabase.from("class_students").select("class_id").eq("student_id", user.id)
 
       setFlashcards(flashcardsData || [])
@@ -191,14 +189,12 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
 
-          {/* Flashcards Tab */}
           <TabsContent value="flashcards"><FlashcardGrid flashcards={flashcards} /></TabsContent>
           <TabsContent value="games"><GameHub /></TabsContent>
           <TabsContent value="quizzes"><StudentQuizzes quizzes={quizzes} onQuizComplete={loadDashboardData} /></TabsContent>
           <TabsContent value="notes"><StudentNotes notes={notes} onNotesChange={loadDashboardData} /></TabsContent>
           <TabsContent value="progress"><StudentProgress results={results} quizzes={quizzes} /></TabsContent>
 
-          {/* Classes Tab */}
           <TabsContent value="classes" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Các Lớp Có Sẵn</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
