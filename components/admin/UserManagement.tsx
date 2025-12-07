@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
 interface UserProfile {
   id: string
@@ -10,8 +10,14 @@ interface UserProfile {
   role: string
 }
 
+// Supabase service role key – TUYỆT ĐỐI KHÔNG để lộ ngoài production
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+const supabaseAdmin: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+const supabaseClient: SupabaseClient = createClient(SUPABASE_URL, "") // bình thường cho role update
+
 export default function UserManagement() {
-  const supabase = createClient()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,10 +25,11 @@ export default function UserManagement() {
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
+  // Lấy danh sách users
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
+      const { data, error } = await supabaseClient.from<UserProfile>("profiles").select("*")
       if (error) console.error("Error fetching users:", error)
       else setUsers(data ?? [])
     } catch (err) {
@@ -37,17 +44,26 @@ export default function UserManagement() {
     fetchUsers()
   }, [])
 
+  // Thêm user mới
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
     try {
-      // Tạo user thông qua API (Supabase client không trực tiếp tạo user mới bằng email/password)
-      const res = await fetch("/api/create-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newEmail, full_name: newFullName, role: newRole }),
+      // 1. Tạo user trong auth
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: newEmail,
+        password: Math.random().toString(36).slice(-8),
+        email_confirm: true,
       })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (authError) throw authError
+
+      const userId = authData.user?.id
+      if (!userId) throw new Error("Không tạo được user")
+
+      // 2. Thêm profile
+      const { error: profileError } = await supabaseAdmin.from("profiles").insert([
+        { id: userId, email: newEmail, full_name: newFullName, role: newRole },
+      ])
+      if (profileError) throw profileError
 
       setNewEmail("")
       setNewFullName("")
@@ -58,20 +74,28 @@ export default function UserManagement() {
     }
   }
 
+  // Xóa user
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", id)
-      if (error) throw error
+      // 1. Xóa profile
+      const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", id)
+      if (profileError) throw profileError
+
+      // 2. Xóa auth user
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id)
+      if (authError) throw authError
+
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
     }
   }
 
+  // Cập nhật role
   const handleUpdateRole = async (id: string, role: string) => {
     try {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
+      const { error } = await supabaseClient.from("profiles").update({ role }).eq("id", id)
       if (error) throw error
       fetchUsers()
     } catch (err: any) {
