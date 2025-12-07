@@ -220,7 +220,6 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
           <TabsList className="grid w-full grid-cols-5 bg-white border-2 border-gray-200">
             <TabsTrigger value="flashcards"><BookOpen className="w-4 h-4" /> Thẻ Học</TabsTrigger>
             <TabsTrigger value="quizzes"><Brain className="w-4 h-4" /> Kiểm Tra</TabsTrigger>
-            <TabsTrigger value="students"><Users className="w-4 h-4" /> Học Sinh</TabsTrigger>
             <TabsTrigger value="analytics"><BarChart3 className="w-4 h-4" /> Phân Tích</TabsTrigger>
             <TabsTrigger value="classes"><Users className="w-4 h-4" /> Lớp Học</TabsTrigger>
           </TabsList>
