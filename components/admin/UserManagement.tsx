@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client" // client anon
+import { v4 as uuidv4 } from "uuid" // tạo UUID tạm nếu cần
 
 interface UserProfile {
   id: string
@@ -11,7 +12,7 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
-  const supabase = createClient()
+  const supabase = createClient() // client-side chỉ fetch dữ liệu
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,11 +20,44 @@ export default function UserManagement() {
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
+  // ------------------------------
+  // Server-side API simulation
+  // ------------------------------
+  const api = {
+    addUser: async (email: string, full_name: string, role: string) => {
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", email, full_name, role }),
+      })
+      return res.json()
+    },
+    deleteUser: async (id: string) => {
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id }),
+      })
+      return res.json()
+    },
+    updateRole: async (id: string, role: string) => {
+      const res = await fetch("/api/admin/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateRole", id, role }),
+      })
+      return res.json()
+    }
+  }
+
+  // ------------------------------
+  // Fetch users
+  // ------------------------------
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
-      if (error) console.error("Error fetching users:", error)
+      const { data, error } = await supabase.from<UserProfile>("profiles").select("*").order("created_at", { ascending: false })
+      if (error) console.error(error)
       else setUsers(data ?? [])
     } catch (err) {
       console.error(err)
@@ -37,17 +71,14 @@ export default function UserManagement() {
     fetchUsers()
   }, [])
 
-  const handleAddUserProfile = async () => {
+  // ------------------------------
+  // Handlers
+  // ------------------------------
+  const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
     try {
-      const { error } = await supabase.from("profiles").insert([{
-        email: newEmail,
-        full_name: newFullName,
-        role: newRole,
-        id: crypto.randomUUID() // tạo id mới cho profile
-      }])
-      if (error) throw error
-
+      const data = await api.addUser(newEmail, newFullName, newRole)
+      if (data.error) throw new Error(data.error)
       setNewEmail("")
       setNewFullName("")
       setNewRole("student")
@@ -60,8 +91,8 @@ export default function UserManagement() {
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", id)
-      if (error) throw error
+      const data = await api.deleteUser(id)
+      if (data.error) throw new Error(data.error)
       fetchUsers()
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message)
@@ -70,8 +101,8 @@ export default function UserManagement() {
 
   const handleUpdateRole = async (id: string, role: string) => {
     try {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", id)
-      if (error) throw error
+      const data = await api.updateRole(id, role)
+      if (data.error) throw new Error(data.error)
       fetchUsers()
     } catch (err: any) {
       alert("Cập nhật role thất bại: " + err.message)
@@ -86,35 +117,14 @@ export default function UserManagement() {
 
       {/* Form thêm user mới */}
       <div className="mb-6 flex gap-2">
-        <input
-          type="email"
-          placeholder="Email"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          className="border px-3 py-1 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Họ và tên"
-          value={newFullName}
-          onChange={(e) => setNewFullName(e.target.value)}
-          className="border px-3 py-1 rounded"
-        />
-        <select
-          value={newRole}
-          onChange={(e) => setNewRole(e.target.value)}
-          className="border px-3 py-1 rounded"
-        >
+        <input type="email" placeholder="Email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border px-3 py-1 rounded" />
+        <input type="text" placeholder="Họ và tên" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} className="border px-3 py-1 rounded" />
+        <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="border px-3 py-1 rounded">
           <option value="student">Student</option>
           <option value="teacher">Teacher</option>
           <option value="admin">Admin</option>
         </select>
-        <button
-          onClick={handleAddUserProfile}
-          className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700"
-        >
-          Thêm user
-        </button>
+        <button onClick={handleAddUser} className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700">Thêm user</button>
       </div>
 
       {/* Bảng user */}
@@ -133,23 +143,14 @@ export default function UserManagement() {
               <td className="border px-3 py-1">{user.email}</td>
               <td className="border px-3 py-1">{user.full_name}</td>
               <td className="border px-3 py-1">
-                <select
-                  value={user.role}
-                  onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                  className="border px-2 py-1 rounded"
-                >
+                <select value={user.role} onChange={(e) => handleUpdateRole(user.id, e.target.value)} className="border px-2 py-1 rounded">
                   <option value="student">Student</option>
                   <option value="teacher">Teacher</option>
                   <option value="admin">Admin</option>
                 </select>
               </td>
               <td className="border px-3 py-1">
-                <button
-                  onClick={() => handleDeleteUser(user.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                >
-                  Xóa
-                </button>
+                <button onClick={() => handleDeleteUser(user.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Xóa</button>
               </td>
             </tr>
           ))}
