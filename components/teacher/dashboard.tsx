@@ -216,16 +216,40 @@ export function TeacherDashboard({ user, profile }: TeacherDashboardProps) {
         )}
 
       <Tabs defaultValue="flashcards" className="space-y-6">
-        <TabsList className="flex w-full bg-white border-2 border-gray-200">
-          <TabsTrigger value="flashcards" className="flex-1 text-center"><BookOpen className="w-4 h-4 mx-auto" /> Thẻ Học
+        <TabsList className="flex w-full bg-white border-2 border-gray-200 rounded-md overflow-hidden">
+          <TabsTrigger
+            value="flashcards"
+            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-center hover:bg-yellow-100 active:bg-yellow-200 transition-colors"
+          >
+            <BookOpen className="w-5 h-5" />
+            <span>Thẻ Học</span>
           </TabsTrigger>
-          <TabsTrigger value="quizzes" className="flex-1 text-center"><Brain className="w-4 h-4 mx-auto" /> Kiểm Tra
+
+          <TabsTrigger
+            value="quizzes"
+            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-center hover:bg-blue-100 active:bg-blue-200 transition-colors"
+          >
+            <Brain className="w-5 h-5" />
+            <span>Kiểm Tra</span>
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex-1 text-center"><BarChart3 className="w-4 h-4 mx-auto" /> Phân Tích
+
+          <TabsTrigger
+            value="analytics"
+            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-center hover:bg-purple-100 active:bg-purple-200 transition-colors"
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span>Phân Tích</span>
           </TabsTrigger>
-          <TabsTrigger value="classes" className="flex-1 text-center"><Users className="w-4 h-4 mx-auto" /> Lớp Học
+
+          <TabsTrigger
+            value="classes"
+            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-center hover:bg-green-100 active:bg-green-200 transition-colors"
+          >
+            <Users className="w-5 h-5" />
+            <span>Lớp Học</span>
           </TabsTrigger>
-          </TabsList>
+        </TabsList>
+
 
           {/* FLASHCARDS TAB */}
           <TabsContent value="flashcards">
