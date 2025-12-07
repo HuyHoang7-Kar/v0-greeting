@@ -1,6 +1,7 @@
 // /app/api/admin/manage-user/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { supabaseServer } from "@/lib/supabase/client"  // import từ file bạn vừa viết
+import { supabaseServer } from "@/lib/supabase/server-client"
+ // import từ file bạn vừa viết
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer()
