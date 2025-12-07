@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 
 interface UserProfile {
   id: string
@@ -11,7 +10,6 @@ interface UserProfile {
 }
 
 export default function UserManagement() {
-  const supabase = createClient() // browser client
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,13 +17,12 @@ export default function UserManagement() {
   const [newFullName, setNewFullName] = useState("")
   const [newRole, setNewRole] = useState("student")
 
-  // Lấy danh sách user
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from<UserProfile>("profiles").select("*")
-      if (error) console.error("Error fetching users:", error)
-      else setUsers(data ?? [])
+      const res = await fetch("/api/admin/manage-user?action=list")
+      const data = await res.json()
+      setUsers(data.users ?? [])
     } catch (err) {
       console.error(err)
       setUsers([])
@@ -38,10 +35,8 @@ export default function UserManagement() {
     fetchUsers()
   }, [])
 
-  // Thêm user
   const handleAddUser = async () => {
     if (!newEmail || !newFullName) return alert("Email và Họ tên không được để trống")
-
     try {
       const res = await fetch("/api/admin/manage-user", {
         method: "POST",
@@ -50,31 +45,29 @@ export default function UserManagement() {
           action: "create",
           email: newEmail,
           full_name: newFullName,
-          role: newRole,
-        }),
+          role: newRole
+        })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-
-      alert("User tạo thành công! Mật khẩu tạm thời: " + data.tempPassword)
 
       setNewEmail("")
       setNewFullName("")
       setNewRole("student")
       fetchUsers()
+      alert("Tạo user thành công! User sẽ nhận email xác nhận.")
     } catch (err: any) {
       alert("Thêm user thất bại: " + err.message)
     }
   }
 
-  // Xóa user
   const handleDeleteUser = async (id: string) => {
     if (!confirm("Bạn có chắc muốn xóa user này?")) return
     try {
       const res = await fetch("/api/admin/manage-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
+        body: JSON.stringify({ action: "delete", id })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -84,13 +77,12 @@ export default function UserManagement() {
     }
   }
 
-  // Cập nhật role
   const handleUpdateRole = async (id: string, role: string) => {
     try {
       const res = await fetch("/api/admin/manage-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateRole", id, role }),
+        body: JSON.stringify({ action: "updateRole", id, role })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -106,7 +98,6 @@ export default function UserManagement() {
     <div>
       <h2 className="text-lg font-semibold mb-4">Danh sách người dùng</h2>
 
-      {/* Form thêm user mới */}
       <div className="mb-6 flex gap-2">
         <input
           type="email"
@@ -139,7 +130,6 @@ export default function UserManagement() {
         </button>
       </div>
 
-      {/* Bảng user */}
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100">
