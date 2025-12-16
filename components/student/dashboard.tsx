@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import confetti from "canvas-confetti"
+import { LogOut } from "lucide-react"
 
 import StudentFlashcards from "@/components/student/flashcard-grid"
 import { StudentNotes } from "@/components/student/notes"
@@ -14,7 +15,16 @@ import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
 
-import { LogOut } from "lucide-react"
+/* ===================== IMAGES ===================== */
+const images = {
+  flashcards: "https://cdn-icons-png.flaticon.com/512/4696/4696755.png",
+  quizzes: "https://cdn-icons-png.flaticon.com/512/4196/4196463.png",
+  notes: "https://cdn-icons-png.flaticon.com/512/3468/3468377.png",
+  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png",
+  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png",
+  classes: "https://cdn-icons-png.flaticon.com/512/1670/1670043.png",
+  avatarDefault: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
+}
 
 /* ===================== SOUND ===================== */
 const clickSound = () =>
@@ -23,18 +33,8 @@ const clickSound = () =>
 const winSound = () =>
   new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
 
-/* ===================== IMAGES ===================== */
-const images = {
-  flashcards: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
-  quizzes: "https://cdn-icons-png.flaticon.com/512/4345/4345641.png", // quiz ❓
-  notes: "https://cdn-icons-png.flaticon.com/512/942/942748.png",
-  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png",
-  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png",
-  classDefault:
-    "https://images.unsplash.com/photo-1588072432836-e10032774350?auto=format&fit=crop&w=600&q=80",
-  avatarDefault:
-    "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
-}
+/* ===================== TYPES ===================== */
+type View = "flashcards" | "quizzes" | "notes" | "progress" | "games" | "classes"
 
 /* ===================== JOIN CLASS ===================== */
 function JoinClass({ supabase, userId }: any) {
@@ -59,32 +59,25 @@ function JoinClass({ supabase, userId }: any) {
   }
 
   if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
-
-  if (classes.length === 0)
-    return <p className="text-xl text-center">📭 Chưa có lớp học nào</p>
+  if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học nào</p>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {classes.map((c) => (
         <Card
           key={c.id}
-          className="rounded-[28px] overflow-hidden hover:scale-105 transition shadow-lg"
+          className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
         >
-          <img
-            src={c.image_url || images.classDefault}
-            className="h-36 w-full object-cover"
-          />
-
           <CardHeader>
-            <CardTitle>🏫 {c.name}</CardTitle>
+            <div className="flex items-center gap-3">
+              <img src={images.classes} className="w-10 h-10" />
+              <CardTitle>{c.name}</CardTitle>
+            </div>
             <CardDescription>{c.description}</CardDescription>
           </CardHeader>
-
           <CardContent className="flex justify-between items-center">
             {joined.includes(c.id) ? (
-              <Badge className="bg-green-200 text-green-800">
-                ✅ Đã tham gia
-              </Badge>
+              <Badge className="bg-green-200 text-green-800">✅ Đã tham gia</Badge>
             ) : (
               <Button size="sm">➕ Tham gia</Button>
             )}
@@ -96,15 +89,6 @@ function JoinClass({ supabase, userId }: any) {
 }
 
 /* ===================== DASHBOARD ===================== */
-
-type View =
-  | "flashcards"
-  | "quizzes"
-  | "notes"
-  | "progress"
-  | "games"
-  | "classes"
-
 export function StudentDashboard({ user, profile }: any) {
   const supabase = createClient()
   const router = useRouter()
@@ -137,7 +121,7 @@ export function StudentDashboard({ user, profile }: any) {
 
   const onQuizDone = () => {
     winSound()
-    confetti({ particleCount: 200, spread: 150 })
+    confetti({ particleCount: 200, spread: 160 })
     load()
   }
 
@@ -148,21 +132,20 @@ export function StudentDashboard({ user, profile }: any) {
       {/* HEADER */}
       <header className="bg-white shadow sticky top-0 z-10">
         <div className="flex justify-between items-center px-6 py-4">
-          <h1 className="text-3xl font-extrabold text-pink-500">
-            Học tập cùng Flashcard 🎒
-          </h1>
-
-          {/* AVATAR */}
-          <div className="flex items-center gap-4">
-            <Badge className="bg-yellow-200 text-yellow-800 text-lg px-4 py-2">
-              ⭐ {points?.total_score || 0}
-            </Badge>
-
+          <div className="flex items-center gap-3">
             <img
               src={profile?.avatar_url || images.avatarDefault}
-              className="w-12 h-12 rounded-full border-4 border-pink-300 shadow-md"
+              className="w-12 h-12 rounded-full border-2 border-pink-400"
             />
+            <h1 className="text-3xl font-extrabold text-pink-500">
+              Học tập cùng Flashcard 🎒
+            </h1>
+          </div>
 
+          <div className="flex gap-4 items-center">
+            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-1 text-lg">
+              🏆 {points?.total_score || 0}
+            </Badge>
             <Button
               variant="outline"
               onClick={async () => {
@@ -178,12 +161,12 @@ export function StudentDashboard({ user, profile }: any) {
 
       {/* MENU */}
       <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        <MenuTile title="Flashcards" img={images.flashcards} onClick={() => setView("flashcards")} />
-        <MenuTile title="Quiz" img={images.quizzes} onClick={() => setView("quizzes")} />
-        <MenuTile title="Ghi chú" img={images.notes} onClick={() => setView("notes")} />
-        <MenuTile title="Tiến độ" img={images.progress} onClick={() => setView("progress")} />
-        <MenuTile title="Trò chơi" img={images.games} onClick={() => setView("games")} />
-        <MenuTile title="Lớp học" img={images.classDefault} onClick={() => setView("classes")} />
+        <Tile title="Flashcards" img={images.flashcards} onClick={() => setView("flashcards")} />
+        <Tile title="Quiz" img={images.quizzes} onClick={() => setView("quizzes")} />
+        <Tile title="Notes" img={images.notes} onClick={() => setView("notes")} />
+        <Tile title="Progress" img={images.progress} onClick={() => setView("progress")} />
+        <Tile title="Games" img={images.games} onClick={() => setView("games")} />
+        <Tile title="Classes" img={images.classes} onClick={() => setView("classes")} />
       </div>
 
       {/* CONTENT */}
@@ -193,30 +176,26 @@ export function StudentDashboard({ user, profile }: any) {
           <StudentQuizzes quizzes={quizzes} onQuizComplete={onQuizDone} />
         )}
         {view === "notes" && <StudentNotes notes={notes} onNotesChange={load} />}
-        {view === "progress" && (
-          <StudentProgress results={results} quizzes={quizzes} />
-        )}
+        {view === "progress" && <StudentProgress results={results} quizzes={quizzes} />}
         {view === "games" && <GameHub />}
-        {view === "classes" && (
-          <JoinClass supabase={supabase} userId={user.id} />
-        )}
+        {view === "classes" && <JoinClass supabase={supabase} userId={user.id} />}
       </div>
     </div>
   )
 }
 
 /* ===================== TILE ===================== */
-function MenuTile({ title, img, onClick }: any) {
+function Tile({ title, img, onClick }: any) {
   return (
     <div
       onClick={() => {
         clickSound()
         onClick()
       }}
-      className="cursor-pointer rounded-[28px] bg-white p-6 flex flex-col items-center gap-3
-      shadow-lg hover:scale-110 transition"
+      className="cursor-pointer rounded-3xl bg-white p-6 flex flex-col items-center gap-3
+      shadow-xl hover:scale-110 transition"
     >
-      <img src={img} className="w-20 h-20" />
+      <img src={img} className="w-16 h-16 animate-bounce" />
       <p className="font-bold text-lg text-pink-600">{title}</p>
     </div>
   )
