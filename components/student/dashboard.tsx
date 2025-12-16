@@ -23,19 +23,18 @@ const clickSound = () =>
 const winSound = () =>
   new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
 
-/* ===================== ANIMAL IMAGES ===================== */
+/* ===================== ANIMAL IMAGES (NEW – TIỂU HỌC) ===================== */
 const animals = {
-  flashcards: "https://cdn-icons-png.flaticon.com/512/616/616408.png", // fox
-  quizzes: "https://cdn-icons-png.flaticon.com/512/616/616430.png", // panda
-  notes: "https://cdn-icons-png.flaticon.com/512/616/616494.png", // bunny
-  progress: "https://cdn-icons-png.flaticon.com/512/616/616554.png", // lion
-  games: "https://cdn-icons-png.flaticon.com/512/616/616408.png",
-  classes: "https://cdn-icons-png.flaticon.com/512/616/616438.png", // bear
-  mascot: "https://cdn-icons-png.flaticon.com/512/616/616430.png",
+  flashcards: "https://cdn-icons-png.flaticon.com/512/4193/4193265.png", // mèo học bài
+  quizzes: "https://cdn-icons-png.flaticon.com/512/1998/1998610.png", // gấu thông minh
+  notes: "https://cdn-icons-png.flaticon.com/512/2942/2942860.png", // thỏ ghi chép
+  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png", // sư tử huy hiệu
+  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png", // tay cầm game
+  classes: "https://cdn-icons-png.flaticon.com/512/2942/2942065.png", // lớp học
+  mascot: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png", // bé học sinh
 }
 
 /* ===================== JOIN CLASS ===================== */
-
 function JoinClass({ supabase, userId }: any) {
   const [classes, setClasses] = useState<any[]>([])
   const [joined, setJoined] = useState<string[]>([])
@@ -58,14 +57,22 @@ function JoinClass({ supabase, userId }: any) {
   }
 
   if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
-  if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học</p>
+
+  if (classes.length === 0)
+    return (
+      <div className="text-center text-xl text-gray-500">
+        📭 Chưa có lớp học nào<br />
+        <span className="text-sm">Hỏi thầy cô để được thêm lớp nhé!</span>
+      </div>
+    )
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {classes.map((c) => (
         <Card
           key={c.id}
-          className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
+          className="rounded-[32px] bg-gradient-to-br from-yellow-100 to-pink-100
+          hover:scale-105 transition shadow-lg"
         >
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -75,7 +82,9 @@ function JoinClass({ supabase, userId }: any) {
           </CardHeader>
           <CardContent className="flex justify-between items-center">
             {joined.includes(c.id) ? (
-              <Badge className="bg-green-200 text-green-800">✅ Đã tham gia</Badge>
+              <Badge className="bg-green-200 text-green-800 text-sm">
+                ✅ Đã tham gia
+              </Badge>
             ) : (
               <Button size="sm">➕ Tham gia</Button>
             )}
@@ -134,15 +143,15 @@ export function StudentDashboard({ user }: any) {
       <header className="bg-white shadow sticky top-0 z-10">
         <div className="flex justify-between items-center px-6 py-4">
           <div className="flex items-center gap-3">
-            <img src={animals.mascot} className="w-12 h-12 animate-bounce" />
+            <img src={animals.mascot} className="w-14 h-14 animate-bounce" />
             <h1 className="text-3xl font-extrabold text-pink-500">
-              EduKids 🎈
+              Học tập cùng Flashcard 🎒
             </h1>
           </div>
 
           <div className="flex gap-4 items-center">
-            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-1 text-lg">
-              🏆 {points?.total_score || 0}
+            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-2 text-lg rounded-full">
+              ⭐ {points?.total_score || 0}
             </Badge>
             <Button
               variant="outline"
@@ -161,10 +170,10 @@ export function StudentDashboard({ user }: any) {
       <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
         <AnimalTile title="Flashcards" img={animals.flashcards} onClick={() => setView("flashcards")} />
         <AnimalTile title="Quiz" img={animals.quizzes} onClick={() => setView("quizzes")} />
-        <AnimalTile title="Notes" img={animals.notes} onClick={() => setView("notes")} />
-        <AnimalTile title="Progress" img={animals.progress} onClick={() => setView("progress")} />
-        <AnimalTile title="Games" img={animals.games} onClick={() => setView("games")} />
-        <AnimalTile title="Classes" img={animals.classes} onClick={() => setView("classes")} />
+        <AnimalTile title="Ghi chú" img={animals.notes} onClick={() => setView("notes")} />
+        <AnimalTile title="Tiến độ" img={animals.progress} onClick={() => setView("progress")} />
+        <AnimalTile title="Trò chơi" img={animals.games} onClick={() => setView("games")} />
+        <AnimalTile title="Lớp học" img={animals.classes} onClick={() => setView("classes")} />
       </div>
 
       {/* CONTENT */}
@@ -191,11 +200,14 @@ function AnimalTile({ title, img, onClick }: any) {
         clickSound()
         onClick()
       }}
-      className="cursor-pointer rounded-3xl bg-white p-6 flex flex-col items-center gap-3
-      shadow-xl hover:scale-110 transition"
+      className="cursor-pointer rounded-[32px] bg-gradient-to-br from-white to-yellow-50
+      p-6 flex flex-col items-center gap-3
+      shadow-lg hover:scale-110 hover:rotate-1 transition-all duration-300"
     >
-      <img src={img} className="w-16 h-16 animate-pulse" />
-      <p className="font-bold text-lg text-pink-600">{title}</p>
+      <img src={img} className="w-20 h-20 drop-shadow-md" />
+      <p className="font-extrabold text-lg text-orange-500 text-center">
+        {title}
+      </p>
     </div>
   )
 }
