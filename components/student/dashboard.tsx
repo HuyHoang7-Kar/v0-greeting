@@ -23,15 +23,17 @@ const clickSound = () =>
 const winSound = () =>
   new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
 
-/* ===================== ANIMAL IMAGES (NEW – TIỂU HỌC) ===================== */
-const animals = {
-  flashcards: "https://cdn-icons-png.flaticon.com/512/4193/4193265.png", // mèo học bài
-  quizzes: "https://cdn-icons-png.flaticon.com/512/1998/1998610.png", // gấu thông minh
-  notes: "https://cdn-icons-png.flaticon.com/512/2942/2942860.png", // thỏ ghi chép
-  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png", // sư tử huy hiệu
-  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png", // tay cầm game
-  classes: "https://cdn-icons-png.flaticon.com/512/2942/2942065.png", // lớp học
-  mascot: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png", // bé học sinh
+/* ===================== IMAGES ===================== */
+const images = {
+  flashcards: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
+  quizzes: "https://cdn-icons-png.flaticon.com/512/4345/4345641.png", // quiz ❓
+  notes: "https://cdn-icons-png.flaticon.com/512/942/942748.png",
+  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png",
+  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png",
+  classDefault:
+    "https://images.unsplash.com/photo-1588072432836-e10032774350?auto=format&fit=crop&w=600&q=80",
+  avatarDefault:
+    "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
 }
 
 /* ===================== JOIN CLASS ===================== */
@@ -59,30 +61,28 @@ function JoinClass({ supabase, userId }: any) {
   if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
 
   if (classes.length === 0)
-    return (
-      <div className="text-center text-xl text-gray-500">
-        📭 Chưa có lớp học nào<br />
-        <span className="text-sm">Hỏi thầy cô để được thêm lớp nhé!</span>
-      </div>
-    )
+    return <p className="text-xl text-center">📭 Chưa có lớp học nào</p>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {classes.map((c) => (
         <Card
           key={c.id}
-          className="rounded-[32px] bg-gradient-to-br from-yellow-100 to-pink-100
-          hover:scale-105 transition shadow-lg"
+          className="rounded-[28px] overflow-hidden hover:scale-105 transition shadow-lg"
         >
+          <img
+            src={c.image_url || images.classDefault}
+            className="h-36 w-full object-cover"
+          />
+
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              🏫 {c.name}
-            </CardTitle>
+            <CardTitle>🏫 {c.name}</CardTitle>
             <CardDescription>{c.description}</CardDescription>
           </CardHeader>
+
           <CardContent className="flex justify-between items-center">
             {joined.includes(c.id) ? (
-              <Badge className="bg-green-200 text-green-800 text-sm">
+              <Badge className="bg-green-200 text-green-800">
                 ✅ Đã tham gia
               </Badge>
             ) : (
@@ -97,9 +97,15 @@ function JoinClass({ supabase, userId }: any) {
 
 /* ===================== DASHBOARD ===================== */
 
-type View = "flashcards" | "quizzes" | "notes" | "progress" | "games" | "classes"
+type View =
+  | "flashcards"
+  | "quizzes"
+  | "notes"
+  | "progress"
+  | "games"
+  | "classes"
 
-export function StudentDashboard({ user }: any) {
+export function StudentDashboard({ user, profile }: any) {
   const supabase = createClient()
   const router = useRouter()
 
@@ -131,7 +137,7 @@ export function StudentDashboard({ user }: any) {
 
   const onQuizDone = () => {
     winSound()
-    confetti({ particleCount: 200, spread: 140 })
+    confetti({ particleCount: 200, spread: 150 })
     load()
   }
 
@@ -142,17 +148,21 @@ export function StudentDashboard({ user }: any) {
       {/* HEADER */}
       <header className="bg-white shadow sticky top-0 z-10">
         <div className="flex justify-between items-center px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src={animals.mascot} className="w-14 h-14 animate-bounce" />
-            <h1 className="text-3xl font-extrabold text-pink-500">
-              Học tập cùng Flashcard 🎒
-            </h1>
-          </div>
+          <h1 className="text-3xl font-extrabold text-pink-500">
+            Học tập cùng Flashcard 🎒
+          </h1>
 
-          <div className="flex gap-4 items-center">
-            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-2 text-lg rounded-full">
+          {/* AVATAR */}
+          <div className="flex items-center gap-4">
+            <Badge className="bg-yellow-200 text-yellow-800 text-lg px-4 py-2">
               ⭐ {points?.total_score || 0}
             </Badge>
+
+            <img
+              src={profile?.avatar_url || images.avatarDefault}
+              className="w-12 h-12 rounded-full border-4 border-pink-300 shadow-md"
+            />
+
             <Button
               variant="outline"
               onClick={async () => {
@@ -168,12 +178,12 @@ export function StudentDashboard({ user }: any) {
 
       {/* MENU */}
       <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        <AnimalTile title="Flashcards" img={animals.flashcards} onClick={() => setView("flashcards")} />
-        <AnimalTile title="Quiz" img={animals.quizzes} onClick={() => setView("quizzes")} />
-        <AnimalTile title="Ghi chú" img={animals.notes} onClick={() => setView("notes")} />
-        <AnimalTile title="Tiến độ" img={animals.progress} onClick={() => setView("progress")} />
-        <AnimalTile title="Trò chơi" img={animals.games} onClick={() => setView("games")} />
-        <AnimalTile title="Lớp học" img={animals.classes} onClick={() => setView("classes")} />
+        <MenuTile title="Flashcards" img={images.flashcards} onClick={() => setView("flashcards")} />
+        <MenuTile title="Quiz" img={images.quizzes} onClick={() => setView("quizzes")} />
+        <MenuTile title="Ghi chú" img={images.notes} onClick={() => setView("notes")} />
+        <MenuTile title="Tiến độ" img={images.progress} onClick={() => setView("progress")} />
+        <MenuTile title="Trò chơi" img={images.games} onClick={() => setView("games")} />
+        <MenuTile title="Lớp học" img={images.classDefault} onClick={() => setView("classes")} />
       </div>
 
       {/* CONTENT */}
@@ -183,31 +193,31 @@ export function StudentDashboard({ user }: any) {
           <StudentQuizzes quizzes={quizzes} onQuizComplete={onQuizDone} />
         )}
         {view === "notes" && <StudentNotes notes={notes} onNotesChange={load} />}
-        {view === "progress" && <StudentProgress results={results} quizzes={quizzes} />}
+        {view === "progress" && (
+          <StudentProgress results={results} quizzes={quizzes} />
+        )}
         {view === "games" && <GameHub />}
-        {view === "classes" && <JoinClass supabase={supabase} userId={user.id} />}
+        {view === "classes" && (
+          <JoinClass supabase={supabase} userId={user.id} />
+        )}
       </div>
     </div>
   )
 }
 
 /* ===================== TILE ===================== */
-
-function AnimalTile({ title, img, onClick }: any) {
+function MenuTile({ title, img, onClick }: any) {
   return (
     <div
       onClick={() => {
         clickSound()
         onClick()
       }}
-      className="cursor-pointer rounded-[32px] bg-gradient-to-br from-white to-yellow-50
-      p-6 flex flex-col items-center gap-3
-      shadow-lg hover:scale-110 hover:rotate-1 transition-all duration-300"
+      className="cursor-pointer rounded-[28px] bg-white p-6 flex flex-col items-center gap-3
+      shadow-lg hover:scale-110 transition"
     >
-      <img src={img} className="w-20 h-20 drop-shadow-md" />
-      <p className="font-extrabold text-lg text-orange-500 text-center">
-        {title}
-      </p>
+      <img src={img} className="w-20 h-20" />
+      <p className="font-bold text-lg text-pink-600">{title}</p>
     </div>
   )
 }
