@@ -35,8 +35,8 @@ const images = {
   // 🏫 CLASS – lớp học hoạt hình (MỚI)
   classes: "https://cdn-icons-png.flaticon.com/512/8074/8074808.png",
 
-  // 👧👦 AVATAR mặc định
-  avatarDefault: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
+  // 👧👦 AVATAR mặc định (ĐỘNG VẬT – TRẺ EM)
+  avatarDefault: "https://cdn-icons-png.flaticon.com/512/616/616408.png", // gấu hoạt hình
 }
 
 /* ===================== SOUND ===================== */
@@ -54,6 +54,7 @@ function JoinClass({ supabase, userId }: any) {
   const [classes, setClasses] = useState<any[]>([])
   const [joined, setJoined] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [joiningId, setJoiningId] = useState<string | null>(null)
 
   useEffect(() => {
     load()
@@ -71,35 +72,65 @@ function JoinClass({ supabase, userId }: any) {
     setLoading(false)
   }
 
+  const joinClass = async (classId: string) => {
+    setJoiningId(classId)
+
+    const { error } = await supabase.from("class_members").insert({
+      user_id: userId,
+      class_id: classId,
+    })
+
+    if (!error) {
+      clickSound()
+      await load() // reload danh sách
+    }
+
+    setJoiningId(null)
+  }
+
   if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
   if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học nào</p>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {classes.map((c) => (
-        <Card
-          key={c.id}
-          className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
-        >
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <img src={images.classes} className="w-10 h-10" />
-              <CardTitle>{c.name}</CardTitle>
-            </div>
-            <CardDescription>{c.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-between items-center">
-            {joined.includes(c.id) ? (
-              <Badge className="bg-green-200 text-green-800">✅ Đã tham gia</Badge>
-            ) : (
-              <Button size="sm">➕ Tham gia</Button>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      {classes.map((c) => {
+        const isJoined = joined.includes(c.id)
+
+        return (
+          <Card
+            key={c.id}
+            className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
+          >
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <img src={images.classes} className="w-10 h-10" />
+                <CardTitle>{c.name}</CardTitle>
+              </div>
+              <CardDescription>{c.description}</CardDescription>
+            </CardHeader>
+
+            <CardContent className="flex justify-between items-center">
+              {isJoined ? (
+                <Badge className="bg-green-200 text-green-800">
+                  ✅ Đã tham gia
+                </Badge>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={joiningId === c.id}
+                  onClick={() => joinClass(c.id)}
+                >
+                  {joiningId === c.id ? "⏳ Đang vào..." : "➕ Tham gia"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
+
 
 /* ===================== DASHBOARD ===================== */
 export function StudentDashboard({ user, profile }: any) {
