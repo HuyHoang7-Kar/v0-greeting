@@ -15,14 +15,27 @@ import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
 
-/* ===================== IMAGES ===================== */
+/* ===================== IMAGES (UPDATED) ===================== */
 const images = {
-  flashcards: "https://cdn-icons-png.flaticon.com/512/4696/4696755.png",
-  quizzes: "https://cdn-icons-png.flaticon.com/512/4196/4196463.png",
-  notes: "https://cdn-icons-png.flaticon.com/512/3468/3468377.png",
+  // 📚 FLASHCARD – thẻ học hoạt hình (MỚI)
+  flashcards: "https://cdn-icons-png.flaticon.com/512/2436/2436874.png",
+
+  // 📝 NOTES – dùng ảnh flashcard cũ (CHUYỂN SANG)
+  notes: "https://cdn-icons-png.flaticon.com/512/4696/4696755.png",
+
+  // ❓ QUIZ – bài kiểm tra hoạt hình (MỚI)
+  quizzes: "https://cdn-icons-png.flaticon.com/512/2010/2010990.png",
+
+  // 📈 PROGRESS – huy hiệu, sao
   progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png",
+
+  // 🎮 GAME
   games: "https://cdn-icons-png.flaticon.com/512/686/686589.png",
-  classes: "https://cdn-icons-png.flaticon.com/512/1670/1670043.png",
+
+  // 🏫 CLASS – lớp học hoạt hình (MỚI)
+  classes: "https://cdn-icons-png.flaticon.com/512/8074/8074808.png",
+
+  // 👧👦 AVATAR mặc định
   avatarDefault: "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
 }
 
