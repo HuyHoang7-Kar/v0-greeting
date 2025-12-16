@@ -14,16 +14,7 @@ import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
 import { GameHub } from "@/components/games/game-hub"
 
-import {
-  BookOpen,
-  Brain,
-  FileText,
-  TrendingUp,
-  LogOut,
-  Medal,
-  Users,
-  Gamepad2,
-} from "lucide-react"
+import { LogOut } from "lucide-react"
 
 /* ===================== SOUND ===================== */
 const clickSound = () =>
@@ -31,6 +22,17 @@ const clickSound = () =>
 
 const winSound = () =>
   new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
+
+/* ===================== ANIMAL IMAGES ===================== */
+const animals = {
+  flashcards: "https://cdn-icons-png.flaticon.com/512/616/616408.png", // fox
+  quizzes: "https://cdn-icons-png.flaticon.com/512/616/616430.png", // panda
+  notes: "https://cdn-icons-png.flaticon.com/512/616/616494.png", // bunny
+  progress: "https://cdn-icons-png.flaticon.com/512/616/616554.png", // lion
+  games: "https://cdn-icons-png.flaticon.com/512/616/616408.png",
+  classes: "https://cdn-icons-png.flaticon.com/512/616/616438.png", // bear
+  mascot: "https://cdn-icons-png.flaticon.com/512/616/616430.png",
+}
 
 /* ===================== JOIN CLASS ===================== */
 
@@ -63,10 +65,12 @@ function JoinClass({ supabase, userId }: any) {
       {classes.map((c) => (
         <Card
           key={c.id}
-          className="rounded-3xl bg-gradient-to-br from-pink-100 to-yellow-100 hover:scale-105 transition"
+          className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
         >
           <CardHeader>
-            <CardTitle className="text-lg">🏫 {c.name}</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              🏫 {c.name}
+            </CardTitle>
             <CardDescription>{c.description}</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-between items-center">
@@ -91,7 +95,6 @@ export function StudentDashboard({ user }: any) {
   const router = useRouter()
 
   const [view, setView] = useState<View>("flashcards")
-  const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
@@ -103,7 +106,6 @@ export function StudentDashboard({ user }: any) {
   }, [])
 
   const load = async () => {
-    setFlashcards((await supabase.from("flashcards").select("*")).data || [])
     setQuizzes((await supabase.from("quizzes").select("*")).data || [])
     setNotes(
       (await supabase.from("notes").select("*").eq("user_id", user.id)).data || []
@@ -120,7 +122,7 @@ export function StudentDashboard({ user }: any) {
 
   const onQuizDone = () => {
     winSound()
-    confetti({ particleCount: 150, spread: 120 })
+    confetti({ particleCount: 200, spread: 140 })
     load()
   }
 
@@ -131,7 +133,12 @@ export function StudentDashboard({ user }: any) {
       {/* HEADER */}
       <header className="bg-white shadow sticky top-0 z-10">
         <div className="flex justify-between items-center px-6 py-4">
-          <h1 className="text-3xl font-extrabold text-pink-500">🎈 EduKids</h1>
+          <div className="flex items-center gap-3">
+            <img src={animals.mascot} className="w-12 h-12 animate-bounce" />
+            <h1 className="text-3xl font-extrabold text-pink-500">
+              EduKids 🎈
+            </h1>
+          </div>
 
           <div className="flex gap-4 items-center">
             <Badge className="bg-yellow-200 text-yellow-800 px-4 py-1 text-lg">
@@ -152,12 +159,12 @@ export function StudentDashboard({ user }: any) {
 
       {/* MENU */}
       <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        <Tile title="Flashcard" icon={BookOpen} color="yellow" onClick={() => setView("flashcards")} />
-        <Tile title="Quiz" icon={Brain} color="pink" onClick={() => setView("quizzes")} />
-        <Tile title="Ghi chú" icon={FileText} color="green" onClick={() => setView("notes")} />
-        <Tile title="Tiến độ" icon={TrendingUp} color="purple" onClick={() => setView("progress")} />
-        <Tile title="Game" icon={Gamepad2} color="blue" onClick={() => setView("games")} />
-        <Tile title="Lớp học" icon={Users} color="cyan" onClick={() => setView("classes")} />
+        <AnimalTile title="Flashcards" img={animals.flashcards} onClick={() => setView("flashcards")} />
+        <AnimalTile title="Quiz" img={animals.quizzes} onClick={() => setView("quizzes")} />
+        <AnimalTile title="Notes" img={animals.notes} onClick={() => setView("notes")} />
+        <AnimalTile title="Progress" img={animals.progress} onClick={() => setView("progress")} />
+        <AnimalTile title="Games" img={animals.games} onClick={() => setView("games")} />
+        <AnimalTile title="Classes" img={animals.classes} onClick={() => setView("classes")} />
       </div>
 
       {/* CONTENT */}
@@ -177,28 +184,18 @@ export function StudentDashboard({ user }: any) {
 
 /* ===================== TILE ===================== */
 
-function Tile({ title, icon: Icon, color, onClick }: any) {
-  const colors: any = {
-    yellow: "from-yellow-200 to-yellow-400",
-    pink: "from-pink-200 to-pink-400",
-    green: "from-green-200 to-green-400",
-    purple: "from-purple-200 to-purple-400",
-    blue: "from-sky-200 to-sky-400",
-    cyan: "from-cyan-200 to-cyan-400",
-  }
-
+function AnimalTile({ title, img, onClick }: any) {
   return (
     <div
       onClick={() => {
         clickSound()
         onClick()
       }}
-      className={`cursor-pointer rounded-3xl bg-gradient-to-br ${colors[color]}
-      p-6 flex flex-col items-center gap-3 text-white
-      shadow-lg hover:scale-110 transition`}
+      className="cursor-pointer rounded-3xl bg-white p-6 flex flex-col items-center gap-3
+      shadow-xl hover:scale-110 transition"
     >
-      <Icon className="w-10 h-10" />
-      <p className="font-bold text-lg">{title}</p>
+      <img src={img} className="w-16 h-16 animate-pulse" />
+      <p className="font-bold text-lg text-pink-600">{title}</p>
     </div>
   )
 }
