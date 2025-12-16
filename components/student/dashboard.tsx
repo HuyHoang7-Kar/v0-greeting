@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 
 import StudentFlashcards from "@/components/student/flashcard-grid"
@@ -19,9 +18,9 @@ import {
   FileText,
   TrendingUp,
   LogOut,
-  Gamepad2,
   Medal,
   Users,
+  Gamepad2,
 } from "lucide-react"
 
 import { useRouter } from "next/navigation"
@@ -45,8 +44,6 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
   }, [])
 
   const loadClasses = async () => {
-    setLoading(true)
-
     const { data: classesData } = await supabase
       .from("classes")
       .select("*")
@@ -79,7 +76,7 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
                 {new Date(cls.created_at).toLocaleDateString()}
               </span>
               {joined ? (
-                <Badge className="bg-green-200 text-green-800">Đã tham gia</Badge>
+                <Badge className="bg-green-100 text-green-700">Đã tham gia</Badge>
               ) : (
                 <Button size="sm">Tham gia</Button>
               )}
@@ -99,10 +96,19 @@ interface Profile {
   full_name: string
 }
 
+type View =
+  | "flashcards"
+  | "quizzes"
+  | "notes"
+  | "progress"
+  | "games"
+  | "classes"
+
 export function StudentDashboard({ user, profile }: { user: any; profile: Profile }) {
   const supabase = createClient()
   const router = useRouter()
 
+  const [activeView, setActiveView] = useState<View>("flashcards")
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
@@ -115,8 +121,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   }, [])
 
   const loadData = async () => {
-    setLoading(true)
-
     const { data: flashcardsData } = await supabase.from("flashcards").select("*")
     const { data: quizzesData } = await supabase.from("quizzes").select("*")
     const { data: notesData } = await supabase
@@ -138,7 +142,6 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
     setNotes(notesData || [])
     setResults(resultsData || [])
     setUserPoints(pointsData)
-
     setLoading(false)
   }
 
@@ -171,85 +174,113 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
         </div>
       </header>
 
-      {/* MENU */}
+      {/* DASHBOARD MENU */}
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="flashcards">
-          <TabsList className="bg-transparent p-0 mb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
 
-              {/* THẺ HỌC */}
-              <TabsTrigger value="flashcards" className="p-0">
-                <div className="w-full h-28 bg-yellow-50 border border-yellow-300 rounded-2xl p-5 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-700">Thẻ học có sẵn</p>
-                    <p className="text-3xl font-bold">{flashcards.length}</p>
-                  </div>
-                  <BookOpen className="w-7 h-7 text-yellow-500" />
-                </div>
-              </TabsTrigger>
+          <DashboardCard
+            title="Thẻ học có sẵn"
+            value={flashcards.length}
+            icon={BookOpen}
+            color="yellow"
+            onClick={() => setActiveView("flashcards")}
+          />
 
-              {/* KIỂM TRA */}
-              <TabsTrigger value="quizzes" className="p-0">
-                <div className="w-full h-28 bg-blue-50 border border-blue-300 rounded-2xl p-5 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-700">Bài kiểm tra</p>
-                    <p className="text-3xl font-bold">{quizzes.length}</p>
-                  </div>
-                  <Brain className="w-7 h-7 text-blue-500" />
-                </div>
-              </TabsTrigger>
+          <DashboardCard
+            title="Bài kiểm tra"
+            value={quizzes.length}
+            icon={Brain}
+            color="blue"
+            onClick={() => setActiveView("quizzes")}
+          />
 
-              {/* GHI CHÚ */}
-              <TabsTrigger value="notes" className="p-0">
-                <div className="w-full h-28 bg-green-50 border border-green-300 rounded-2xl p-5 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-700">Ghi chú của tôi</p>
-                    <p className="text-3xl font-bold">{notes.length}</p>
-                  </div>
-                  <FileText className="w-7 h-7 text-green-500" />
-                </div>
-              </TabsTrigger>
+          <DashboardCard
+            title="Ghi chú của tôi"
+            value={notes.length}
+            icon={FileText}
+            color="green"
+            onClick={() => setActiveView("notes")}
+          />
 
-              {/* ĐIỂM */}
-              <TabsTrigger value="progress" className="p-0">
-                <div className="w-full h-28 bg-purple-50 border border-purple-300 rounded-2xl p-5 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-700">Tiến độ</p>
-                    <p className="text-3xl font-bold">{results.length}</p>
-                  </div>
-                  <TrendingUp className="w-7 h-7 text-purple-500" />
-                </div>
-              </TabsTrigger>
+          <DashboardCard
+            title="Tiến độ"
+            value={results.length}
+            icon={TrendingUp}
+            color="purple"
+            onClick={() => setActiveView("progress")}
+          />
 
-            </div>
-          </TabsList>
+          <DashboardCard
+            title="Trò chơi"
+            value="🎮"
+            icon={Gamepad2}
+            color="pink"
+            onClick={() => setActiveView("games")}
+          />
 
-          {/* CONTENT */}
-          <TabsContent value="flashcards">
-            <StudentFlashcards userId={user.id} />
-          </TabsContent>
+          <DashboardCard
+            title="Lớp học"
+            value="👩‍🏫"
+            icon={Users}
+            color="cyan"
+            onClick={() => setActiveView("classes")}
+          />
+        </div>
 
-          <TabsContent value="games">
-            <GameHub />
-          </TabsContent>
-
-          <TabsContent value="quizzes">
-            <StudentQuizzes quizzes={quizzes} onQuizComplete={loadData} />
-          </TabsContent>
-
-          <TabsContent value="notes">
-            <StudentNotes notes={notes} onNotesChange={loadData} />
-          </TabsContent>
-
-          <TabsContent value="progress">
-            <StudentProgress results={results} quizzes={quizzes} />
-          </TabsContent>
-
-          <TabsContent value="classes">
-            <JoinClass supabase={supabase} userId={user.id} />
-          </TabsContent>
-        </Tabs>
+        {/* CONTENT */}
+        {activeView === "flashcards" && <StudentFlashcards userId={user.id} />}
+        {activeView === "quizzes" && (
+          <StudentQuizzes quizzes={quizzes} onQuizComplete={loadData} />
+        )}
+        {activeView === "notes" && (
+          <StudentNotes notes={notes} onNotesChange={loadData} />
+        )}
+        {activeView === "progress" && (
+          <StudentProgress results={results} quizzes={quizzes} />
+        )}
+        {activeView === "games" && <GameHub />}
+        {activeView === "classes" && (
+          <JoinClass supabase={supabase} userId={user.id} />
+        )}
       </div>
+    </div>
+  )
+}
+
+/* ===================== DASHBOARD CARD ===================== */
+
+function DashboardCard({
+  title,
+  value,
+  icon: Icon,
+  color,
+  onClick,
+}: {
+  title: string
+  value: any
+  icon: any
+  color: "yellow" | "blue" | "green" | "purple" | "pink" | "cyan"
+  onClick: () => void
+}) {
+  const colors: any = {
+    yellow: "bg-yellow-50 border-yellow-300 text-yellow-500",
+    blue: "bg-blue-50 border-blue-300 text-blue-500",
+    green: "bg-green-50 border-green-300 text-green-500",
+    purple: "bg-purple-50 border-purple-300 text-purple-500",
+    pink: "bg-pink-50 border-pink-300 text-pink-500",
+    cyan: "bg-cyan-50 border-cyan-300 text-cyan-500",
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      className={`cursor-pointer border rounded-2xl p-5 flex justify-between items-center hover:shadow-md transition ${colors[color]}`}
+    >
+      <div>
+        <p className="text-sm text-gray-700">{title}</p>
+        <p className="text-3xl font-bold text-gray-900">{value}</p>
+      </div>
+      <Icon className="w-8 h-8" />
     </div>
   )
 }
