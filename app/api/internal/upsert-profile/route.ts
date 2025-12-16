@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false } }
 )
 
-// 🧸 Avatar hoạt hình trung tính – cho trẻ em
+// 🧸 Avatar hoạt hình trung tính – phù hợp trẻ em
 const DEFAULT_AVATARS = [
   "/avatars/animal-lion.png",
   "/avatars/animal-elephant.png",
@@ -43,22 +43,26 @@ export async function POST(req: Request) {
 
     let userId = id
 
-    // 🔍 tìm user theo email nếu chưa có id
+    // 🔍 Tìm user theo email nếu chưa có id
     if (!userId && email) {
-      const { data: found } = await supabaseAdmin
+      const { data: foundUser, error } = await supabaseAdmin
         .from("auth.users")
         .select("id")
         .eq("email", email)
         .maybeSingle()
 
-      if (!found?.id) {
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      if (!foundUser?.id) {
         return NextResponse.json(
           { ok: false, message: "user-not-found-yet" },
           { status: 202 }
         )
       }
 
-      userId = found.id
+      userId = foundUser.id
     }
 
     if (!userId) {
@@ -68,44 +72,82 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔎 kiểm tra profile đã tồn tại chưa
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("avatar_url")
-      .eq("id", userId)
-      .maybeSingle()
+    // 🔎 Kiểm tra profile đã tồn tại chưa
+    const { data: existingProfile, error: profileError } =
+      await supabaseAdmin
+        .from("profiles")
+        .select("id, avatar_url")
+        .eq("id", userId)
+        .maybeSingle()
 
-    const upsertPayload: any = {
-      id: userId,
-      updated_at: new Date().toISOString(),
+    if (profileError) {
+      return NextResponse.json(
+        { error: profileError.message },
+        { status: 500 }
+      )
     }
 
-    if (full_name !== undefined) upsertPayload.full_name = full_name
-    if (role !== undefined) upsertPayload.role = role
+    // 👉 Xác định avatar cuối cùng
+    const finalAvatar =
+      avatar_url ||
+      existingProfile?.avatar_url ||
+      getRandomAvatar()
 
-    // ⭐ CHỈ set avatar khi:
-    // 1. client gửi lên
-    // 2. HOẶC profile chưa có avatar
-    if (avatar_url) {
-      upsertPayload.avatar_url = avatar_url
-    } else if (!existingProfile?.avatar_url) {
-      upsertPayload.avatar_url = getRandomAvatar()
+    // ===============================
+    // ✅ CASE 1: PROFILE ĐÃ TỒN TẠI → UPDATE
+    // ===============================
+    if (existingProfile) {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          full_name,
+          role,
+          avatar_url: finalAvatar,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
+        .select()
+        .single()
+
+      if (error) {
+        console.error("Update profile error:", error)
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({ ok: true, profile: data })
     }
 
+    // ===============================
+    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI → INSERT
+    // ===============================
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .upsert(upsertPayload, { onConflict: "id" })
+      .insert({
+        id: userId,
+        email,
+        full_name,
+        role,
+        avatar_url: finalAvatar,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .select()
       .single()
 
     if (error) {
-      console.error("Upsert profile error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error("Insert profile error:", error)
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ ok: true, profile: data })
   } catch (err: any) {
-    console.error("Internal upsert-profile error", err)
+    console.error("Internal upsert-profile error:", err)
     return NextResponse.json(
       { error: String(err) },
       { status: 500 }
