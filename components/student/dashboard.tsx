@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 
 import StudentFlashcards from "@/components/student/flashcard-grid"
-import { FlashcardStudyMode } from "@/components/student/flashcard-study-mode"
 import { StudentNotes } from "@/components/student/notes"
 import { StudentQuizzes } from "@/components/student/quizzes"
 import { StudentProgress } from "@/components/student/progress"
@@ -20,9 +19,7 @@ import {
   FileText,
   TrendingUp,
   LogOut,
-  User,
   Gamepad2,
-  Trophy,
   Medal,
   Users,
 } from "lucide-react"
@@ -35,7 +32,6 @@ interface Class {
   id: string
   name: string
   description?: string
-  teacher_id: string
   created_at: string
 }
 
@@ -50,6 +46,7 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
 
   const loadClasses = async () => {
     setLoading(true)
+
     const { data: classesData } = await supabase
       .from("classes")
       .select("*")
@@ -65,15 +62,6 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
     setLoading(false)
   }
 
-  const handleJoin = async (classId: string) => {
-    await supabase.from("class_members").insert({
-      class_id: classId,
-      user_id: userId,
-      role: "student",
-    })
-    setJoinedClasses([...joinedClasses, classId])
-  }
-
   if (loading) return <p>Đang tải lớp học...</p>
 
   return (
@@ -81,21 +69,19 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
       {classes.map((cls) => {
         const joined = joinedClasses.includes(cls.id)
         return (
-          <Card key={cls.id} className="border-2 border-green-200">
+          <Card key={cls.id}>
             <CardHeader>
               <CardTitle>{cls.name}</CardTitle>
               <CardDescription>{cls.description}</CardDescription>
             </CardHeader>
-            <CardContent className="flex justify-between">
+            <CardContent className="flex justify-between items-center">
               <span className="text-sm">
                 {new Date(cls.created_at).toLocaleDateString()}
               </span>
               {joined ? (
                 <Badge className="bg-green-200 text-green-800">Đã tham gia</Badge>
               ) : (
-                <Button size="sm" onClick={() => handleJoin(cls.id)}>
-                  Tham gia
-                </Button>
+                <Button size="sm">Tham gia</Button>
               )}
             </CardContent>
           </Card>
@@ -105,13 +91,12 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
   )
 }
 
-/* ===================== STUDENT DASHBOARD ===================== */
+/* ===================== DASHBOARD ===================== */
 
 interface Profile {
   id: string
   email: string
   full_name: string
-  role: string
 }
 
 export function StudentDashboard({ user, profile }: { user: any; profile: Profile }) {
@@ -140,7 +125,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
       .eq("user_id", user.id)
     const { data: resultsData } = await supabase
       .from("results")
-      .select("*, quizzes(title)")
+      .select("*")
       .eq("user_id", user.id)
     const { data: pointsData } = await supabase
       .from("user_totals")
@@ -160,18 +145,16 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   if (loading) return <p className="p-10">Đang tải...</p>
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50">
+    <div className="min-h-screen bg-[#FFFBEA]">
       {/* HEADER */}
       <header className="bg-white border-b">
         <div className="container mx-auto p-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-8 h-8 text-yellow-600" />
-            <h1 className="text-2xl font-bold">EduCards</h1>
-          </div>
+          <h1 className="text-2xl font-bold">EduCards</h1>
 
-          <div className="flex items-center gap-3">
-            <Badge className="bg-yellow-200 text-yellow-800">
-              <Medal className="w-4 h-4 mr-1" /> {userPoints?.total_score || 0}
+          <div className="flex items-center gap-4">
+            <Badge className="bg-yellow-100 text-yellow-800">
+              <Medal className="w-4 h-4 mr-1" />
+              {userPoints?.total_score || 0}
             </Badge>
             <Button
               size="sm"
@@ -188,33 +171,60 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
         </div>
       </header>
 
-      {/* MENU + CONTENT */}
+      {/* MENU */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="flashcards">
-          {/* ===== MENU CARD LỚN ===== */}
-          <TabsList className="bg-transparent p-0">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-10">
-              {[
-                { v: "flashcards", t: "Thẻ Học", i: BookOpen, c: "from-yellow-400 to-orange-400" },
-                { v: "games", t: "Trò Chơi", i: Gamepad2, c: "from-pink-400 to-red-400" },
-                { v: "quizzes", t: "Kiểm Tra", i: Brain, c: "from-blue-400 to-indigo-400" },
-                { v: "notes", t: "Ghi Chú", i: FileText, c: "from-green-400 to-emerald-400" },
-                { v: "progress", t: "Tiến Độ", i: TrendingUp, c: "from-purple-400 to-violet-400" },
-                { v: "classes", t: "Lớp Học", i: Users, c: "from-cyan-400 to-sky-400" },
-              ].map(({ v, t, i: Icon, c }) => (
-                <TabsTrigger key={v} value={v} className="p-0">
-                  <Card
-                    className={`h-40 w-full flex flex-col items-center justify-center text-white rounded-3xl shadow-lg bg-gradient-to-br ${c} hover:scale-105 transition`}
-                  >
-                    <Icon className="w-12 h-12 mb-2" />
-                    <span className="text-xl font-bold">{t}</span>
-                  </Card>
-                </TabsTrigger>
-              ))}
+          <TabsList className="bg-transparent p-0 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+              {/* THẺ HỌC */}
+              <TabsTrigger value="flashcards" className="p-0">
+                <div className="w-full h-28 bg-yellow-50 border border-yellow-300 rounded-2xl p-5 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">Thẻ học có sẵn</p>
+                    <p className="text-3xl font-bold">{flashcards.length}</p>
+                  </div>
+                  <BookOpen className="w-7 h-7 text-yellow-500" />
+                </div>
+              </TabsTrigger>
+
+              {/* KIỂM TRA */}
+              <TabsTrigger value="quizzes" className="p-0">
+                <div className="w-full h-28 bg-blue-50 border border-blue-300 rounded-2xl p-5 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">Bài kiểm tra</p>
+                    <p className="text-3xl font-bold">{quizzes.length}</p>
+                  </div>
+                  <Brain className="w-7 h-7 text-blue-500" />
+                </div>
+              </TabsTrigger>
+
+              {/* GHI CHÚ */}
+              <TabsTrigger value="notes" className="p-0">
+                <div className="w-full h-28 bg-green-50 border border-green-300 rounded-2xl p-5 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">Ghi chú của tôi</p>
+                    <p className="text-3xl font-bold">{notes.length}</p>
+                  </div>
+                  <FileText className="w-7 h-7 text-green-500" />
+                </div>
+              </TabsTrigger>
+
+              {/* ĐIỂM */}
+              <TabsTrigger value="progress" className="p-0">
+                <div className="w-full h-28 bg-purple-50 border border-purple-300 rounded-2xl p-5 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-gray-700">Tiến độ</p>
+                    <p className="text-3xl font-bold">{results.length}</p>
+                  </div>
+                  <TrendingUp className="w-7 h-7 text-purple-500" />
+                </div>
+              </TabsTrigger>
+
             </div>
           </TabsList>
 
-          {/* ===== CONTENT ===== */}
+          {/* CONTENT */}
           <TabsContent value="flashcards">
             <StudentFlashcards userId={user.id} />
           </TabsContent>
