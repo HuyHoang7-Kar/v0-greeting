@@ -25,76 +25,7 @@ import {
 
 import { useRouter } from "next/navigation"
 
-/* ===================== JOIN CLASS ===================== */
-
-interface Class {
-  id: string
-  name: string
-  description?: string
-  created_at: string
-}
-
-function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
-  const [classes, setClasses] = useState<Class[]>([])
-  const [joinedClasses, setJoinedClasses] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadClasses()
-  }, [])
-
-  const loadClasses = async () => {
-    const { data: classesData } = await supabase
-      .from("classes")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    const { data: joinedData } = await supabase
-      .from("class_members")
-      .select("class_id")
-      .eq("user_id", userId)
-
-    setClasses(classesData || [])
-    setJoinedClasses(joinedData?.map((c) => c.class_id) || [])
-    setLoading(false)
-  }
-
-  if (loading) return <p>Đang tải lớp học...</p>
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {classes.map((cls) => {
-        const joined = joinedClasses.includes(cls.id)
-        return (
-          <Card key={cls.id} className="hover:shadow-lg transition">
-            <CardHeader>
-              <CardTitle>{cls.name}</CardTitle>
-              <CardDescription>{cls.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">
-                {new Date(cls.created_at).toLocaleDateString()}
-              </span>
-              {joined ? (
-                <Badge className="bg-green-100 text-green-700">Đã tham gia</Badge>
-              ) : (
-                <Button size="sm">Tham gia</Button>
-              )}
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ===================== DASHBOARD ===================== */
-
-interface Profile {
-  id: string
-  email: string
-  full_name: string
-}
+/* ===================== VIEW ===================== */
 
 type View =
   | "flashcards"
@@ -104,7 +35,20 @@ type View =
   | "games"
   | "classes"
 
-export function StudentDashboard({ user, profile }: { user: any; profile: Profile }) {
+/* ===================== MASCOT TEXT ===================== */
+
+const mascotText: Record<View, string> = {
+  flashcards: "📚 Học bằng thẻ vui lắm đó!",
+  quizzes: "🧠 Sẵn sàng thử thách trí não chưa?",
+  notes: "✏️ Ghi chú lại cho nhớ nha!",
+  progress: "🚀 Cùng xem con đã tiến bộ thế nào!",
+  games: "🎮 Học mà chơi – chơi mà học!",
+  classes: "👩‍🏫 Tham gia lớp học cùng bạn bè nào!",
+}
+
+/* ===================== DASHBOARD ===================== */
+
+export function StudentDashboard({ user }: { user: any }) {
   const supabase = createClient()
   const router = useRouter()
 
@@ -123,14 +67,8 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
   const loadData = async () => {
     const { data: flashcardsData } = await supabase.from("flashcards").select("*")
     const { data: quizzesData } = await supabase.from("quizzes").select("*")
-    const { data: notesData } = await supabase
-      .from("notes")
-      .select("*")
-      .eq("user_id", user.id)
-    const { data: resultsData } = await supabase
-      .from("results")
-      .select("*")
-      .eq("user_id", user.id)
+    const { data: notesData } = await supabase.from("notes").select("*").eq("user_id", user.id)
+    const { data: resultsData } = await supabase.from("results").select("*").eq("user_id", user.id)
     const { data: pointsData } = await supabase
       .from("user_totals")
       .select("*")
@@ -145,86 +83,56 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
     setLoading(false)
   }
 
-  if (loading) return <p className="p-10">Đang tải...</p>
+  if (loading) {
+    return <p className="p-10 text-2xl">🎨 Đang chuẩn bị bài học cho con...</p>
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-yellow-50 to-blue-50">
       {/* HEADER */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-white shadow-md sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-yellow-600">EduCards</h1>
+          <h1 className="text-3xl font-extrabold text-pink-500">🎒 EduCards</h1>
 
           <div className="flex items-center gap-4">
-            <Badge className="bg-yellow-100 text-yellow-800 px-3 py-1">
-              <Medal className="w-4 h-4 mr-1 inline" />
-              {userPoints?.total_score || 0}
+            <Badge className="bg-yellow-200 text-yellow-900 px-4 py-2 rounded-full text-lg">
+              🏅 {userPoints?.total_score || 0}
             </Badge>
             <Button
-              size="sm"
               variant="outline"
+              className="rounded-full"
               onClick={async () => {
                 await supabase.auth.signOut()
                 router.push("/")
               }}
             >
               <LogOut className="w-4 h-4 mr-1" />
-              Đăng xuất
+              Thoát
             </Button>
           </div>
         </div>
       </header>
 
+      {/* MASCOT */}
+      <div className="container mx-auto px-6 pt-10">
+        <div className="flex items-center gap-6 bg-white rounded-3xl p-6 shadow-md animate-bounce-slow">
+          <div className="text-6xl">🦉</div>
+          <div>
+            <p className="text-xl font-bold text-pink-600">Chào con!</p>
+            <p className="text-lg">{mascotText[activeView]}</p>
+          </div>
+        </div>
+      </div>
+
       {/* MENU */}
-      <div className="container mx-auto px-6 py-10">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
-          <DashboardTile
-            title="Flashcards"
-            value={flashcards.length}
-            icon={BookOpen}
-            color="yellow"
-            active={activeView === "flashcards"}
-            onClick={() => setActiveView("flashcards")}
-          />
-          <DashboardTile
-            title="Quizzes"
-            value={quizzes.length}
-            icon={Brain}
-            color="blue"
-            active={activeView === "quizzes"}
-            onClick={() => setActiveView("quizzes")}
-          />
-          <DashboardTile
-            title="Notes"
-            value={notes.length}
-            icon={FileText}
-            color="green"
-            active={activeView === "notes"}
-            onClick={() => setActiveView("notes")}
-          />
-          <DashboardTile
-            title="Progress"
-            value={results.length}
-            icon={TrendingUp}
-            color="purple"
-            active={activeView === "progress"}
-            onClick={() => setActiveView("progress")}
-          />
-          <DashboardTile
-            title="Games"
-            value="🎮"
-            icon={Gamepad2}
-            color="pink"
-            active={activeView === "games"}
-            onClick={() => setActiveView("games")}
-          />
-          <DashboardTile
-            title="Classes"
-            value="👩‍🏫"
-            icon={Users}
-            color="cyan"
-            active={activeView === "classes"}
-            onClick={() => setActiveView("classes")}
-          />
+      <div className="container mx-auto px-6 py-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 mb-14">
+          <KidTile title="Flashcards" icon={BookOpen} color="yellow" value={flashcards.length} active={activeView==="flashcards"} onClick={()=>setActiveView("flashcards")} />
+          <KidTile title="Quiz" icon={Brain} color="blue" value={quizzes.length} active={activeView==="quizzes"} onClick={()=>setActiveView("quizzes")} />
+          <KidTile title="Notes" icon={FileText} color="green" value={notes.length} active={activeView==="notes"} onClick={()=>setActiveView("notes")} />
+          <KidTile title="Progress" icon={TrendingUp} color="purple" value={results.length} active={activeView==="progress"} onClick={()=>setActiveView("progress")} />
+          <KidTile title="Games" icon={Gamepad2} color="pink" value="🎮" active={activeView==="games"} onClick={()=>setActiveView("games")} />
+          <KidTile title="Classes" icon={Users} color="cyan" value="👩‍🏫" active={activeView==="classes"} onClick={()=>setActiveView("classes")} />
         </div>
 
         {/* CONTENT */}
@@ -233,7 +141,7 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
         {activeView === "notes" && <StudentNotes notes={notes} onNotesChange={loadData} />}
         {activeView === "progress" && <StudentProgress results={results} quizzes={quizzes} />}
         {activeView === "games" && <GameHub />}
-        {activeView === "classes" && <JoinClass supabase={supabase} userId={user.id} />}
+        {activeView === "classes" && <p className="text-xl">📚 Danh sách lớp học ở đây</p>}
       </div>
     </div>
   )
@@ -241,42 +149,36 @@ export function StudentDashboard({ user, profile }: { user: any; profile: Profil
 
 /* ===================== TILE ===================== */
 
-function DashboardTile({
+function KidTile({
   title,
   value,
   icon: Icon,
   color,
   active,
   onClick,
-}: {
-  title: string
-  value: any
-  icon: any
-  color: "yellow" | "blue" | "green" | "purple" | "pink" | "cyan"
-  active: boolean
-  onClick: () => void
-}) {
+}: any) {
   const colors: any = {
-    yellow: "bg-yellow-100 text-yellow-600",
-    blue: "bg-blue-100 text-blue-600",
-    green: "bg-green-100 text-green-600",
-    purple: "bg-purple-100 text-purple-600",
-    pink: "bg-pink-100 text-pink-600",
-    cyan: "bg-cyan-100 text-cyan-600",
+    yellow: "bg-yellow-200",
+    blue: "bg-blue-200",
+    green: "bg-green-200",
+    purple: "bg-purple-200",
+    pink: "bg-pink-200",
+    cyan: "bg-cyan-200",
   }
 
   return (
     <div
       onClick={onClick}
-      className={`cursor-pointer rounded-2xl bg-white p-5 flex flex-col items-center gap-3
-        transition-all duration-300 hover:-translate-y-1 hover:shadow-xl
-        ${active ? "ring-2 ring-yellow-400" : ""}`}
+      className={`cursor-pointer rounded-[2rem] p-6 text-center bg-white
+        transition-all duration-300
+        hover:scale-110 hover:-rotate-1 hover:shadow-2xl
+        ${active ? "ring-4 ring-pink-400 scale-105" : ""}`}
     >
-      <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${colors[color]}`}>
-        <Icon className="w-7 h-7" />
+      <div className={`mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center ${colors[color]}`}>
+        <Icon className="w-8 h-8" />
       </div>
-      <p className="font-semibold text-gray-800">{title}</p>
-      <p className="text-xl font-bold text-gray-900">{value}</p>
+      <p className="font-bold text-lg">{title}</p>
+      <p className="text-2xl mt-1">{value}</p>
     </div>
   )
 }
