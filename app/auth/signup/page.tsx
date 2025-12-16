@@ -11,6 +11,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+/* ================= AVATARS ================= */
+const AVATARS = [
+  "https://cdn-icons-png.flaticon.com/512/4140/4140048.png",
+  "https://cdn-icons-png.flaticon.com/512/4140/4140051.png",
+  "https://cdn-icons-png.flaticon.com/512/1998/1998610.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616408.png",
+  "https://cdn-icons-png.flaticon.com/512/616/616430.png",
+]
+
 export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -20,6 +29,9 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
+
+  // ⭐ AVATAR
+  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0])
 
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -34,6 +46,7 @@ export default function SignUpPage() {
           ...opts,
           full_name: fullName,
           role,
+          avatar_url: avatarUrl, // ⭐ LƯU AVATAR
         }),
       })
       const j = await res.json()
@@ -42,21 +55,6 @@ export default function SignUpPage() {
       console.error('serverUpsertProfile error', err)
       return { ok: false, status: 500, body: { error: String(err) } }
     }
-  }
-
-  async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const res = await serverUpsertProfile({ email: emailToCheck })
-      if (res.ok && res.body?.ok) {
-        return { ok: true, profile: res.body.profile ?? null }
-      }
-      if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
-        await new Promise((r) => setTimeout(r, delayMs))
-        continue
-      }
-      return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
-    }
-    return { ok: false, error: 'timeout_waiting_for_user', status: 408 }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -68,45 +66,34 @@ export default function SignUpPage() {
       setError('Mật khẩu không khớp')
       return
     }
-    if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
-      return
-    }
 
     setIsLoading(true)
     try {
-      const signupOptions: any = {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
-        data: { role, full_name: fullName },
-        user_metadata: { role, full_name: fullName },
-      }
-
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: signupOptions,
-      } as any)
+        options: {
+          data: {
+            full_name: fullName,
+            role,
+            avatar_url: avatarUrl, // ⭐ METADATA
+          },
+        },
+      })
 
-      if (signUpError) {
-        setError(signUpError.message ?? 'Đăng ký thất bại, vui lòng thử lại.')
-        setIsLoading(false)
+      if (error) {
+        setError(error.message)
         return
       }
 
-      const userId = signUpData?.user?.id ?? null
-      if (userId) {
-        const res = await serverUpsertProfile({ id: userId })
-        if (!res.ok) console.warn('server upsert-profile (by id) failed', res)
-      } else {
-        const res = await tryUpsertWithRetry(email)
-        if (!res.ok) console.warn('server upsert-profile (by email) failed or timed out', res)
+      if (data?.user?.id) {
+        await serverUpsertProfile({ id: data.user.id })
       }
 
-      setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
+      setInfo('Đăng ký thành công 🎉')
       router.push('/auth/signup-success')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi')
+    } catch (err: any) {
+      setError(err.message ?? 'Có lỗi xảy ra')
     } finally {
       setIsLoading(false)
     }
@@ -116,102 +103,78 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-0">
-          <CardHeader className="text-center pb-2">
-            <CardTitle className="text-3xl font-bold text-gray-900">Tham Gia EduCards</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">Tạo tài khoản để bắt đầu học tập</CardDescription>
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold">Tham Gia Học tập cùng Flashcard 🎒</CardTitle>
+            <CardDescription>Chọn avatar và tạo tài khoản</CardDescription>
           </CardHeader>
 
-          <CardContent className="pt-6">
+          <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Họ và Tên</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Nguyễn Văn A"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                />
+
+              {/* AVATAR */}
+              <div>
+                <Label>Chọn Avatar</Label>
+                <div className="flex gap-3 mt-2 flex-wrap">
+                  {AVATARS.map((url) => (
+                    <img
+                      key={url}
+                      src={url}
+                      onClick={() => setAvatarUrl(url)}
+                      className={`w-14 h-14 rounded-full cursor-pointer border-4 ${
+                        avatarUrl === url ? 'border-yellow-500' : 'border-transparent'
+                      } hover:scale-110 transition`}
+                    />
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Địa Chỉ Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nguyen@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+              <div>
+                <Label>Họ và tên</Label>
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Tôi là</Label>
-                <Select value={role} onValueChange={(value: 'student' | 'teacher' | 'admin') => setRole(value)}>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+
+              <div>
+                <Label>Vai trò</Label>
+                <Select value={role} onValueChange={(v: any) => setRole(v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn vai trò của bạn" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">Học Sinh</SelectItem>
-                    <SelectItem value="teacher">Giáo Viên</SelectItem>
+                    <SelectItem value="student">Học sinh</SelectItem>
+                    <SelectItem value="teacher">Giáo viên</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Mật Khẩu</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+              <div>
+                <Label>Mật khẩu</Label>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
+              <div>
+                <Label>Xác nhận mật khẩu</Label>
+                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
               </div>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {error && <p className="text-red-600 text-sm">{error}</p>}
 
-              {info && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
-                  {info}
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Đang tạo tài khoản...' : 'Tạo Tài Khoản'}
+              <Button type="submit" className="w-full bg-yellow-500 text-white" disabled={isLoading}>
+                {isLoading ? 'Đang tạo...' : 'Tạo tài khoản'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Đã có tài khoản?{' '}
-                <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">
-                  Đăng nhập tại đây
-                </Link>
-              </p>
-            </div>
+            <p className="text-center text-sm mt-4">
+              Đã có tài khoản?{' '}
+              <Link href="/auth/login" className="text-yellow-600 font-medium">
+                Đăng nhập
+              </Link>
+            </p>
           </CardContent>
         </Card>
       </div>
