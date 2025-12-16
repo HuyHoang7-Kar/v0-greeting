@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
 import confetti from "canvas-confetti"
 
 import StudentFlashcards from "@/components/student/flashcard-grid"
@@ -24,11 +25,16 @@ import {
   Gamepad2,
 } from "lucide-react"
 
-import { useRouter } from "next/navigation"
+/* ===================== SOUND ===================== */
+const clickSound = () =>
+  new Audio("https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3").play()
+
+const winSound = () =>
+  new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
 
 /* ===================== JOIN CLASS ===================== */
 
-function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
+function JoinClass({ supabase, userId }: any) {
   const [classes, setClasses] = useState<any[]>([])
   const [joined, setJoined] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,22 +51,22 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
       .eq("user_id", userId)
 
     setClasses(cls || [])
-    setJoined(mem?.map((m: any) => m.class_id) || [])
+    setJoined(mem?.map((m) => m.class_id) || [])
     setLoading(false)
   }
 
   if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
-  if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học nào</p>
+  if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học</p>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {classes.map((c) => (
         <Card
           key={c.id}
-          className="rounded-3xl bg-gradient-to-br from-pink-100 to-yellow-100 hover:shadow-2xl transition"
+          className="rounded-3xl bg-gradient-to-br from-pink-100 to-yellow-100 hover:scale-105 transition"
         >
           <CardHeader>
-            <CardTitle className="text-lg">{c.name}</CardTitle>
+            <CardTitle className="text-lg">🏫 {c.name}</CardTitle>
             <CardDescription>{c.description}</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-between items-center">
@@ -78,16 +84,19 @@ function JoinClass({ supabase, userId }: { supabase: any; userId: string }) {
 
 /* ===================== DASHBOARD ===================== */
 
+type View = "flashcards" | "quizzes" | "notes" | "progress" | "games" | "classes"
+
 export function StudentDashboard({ user }: any) {
   const supabase = createClient()
   const router = useRouter()
 
-  const [view, setView] = useState("flashcards")
+  const [view, setView] = useState<View>("flashcards")
   const [flashcards, setFlashcards] = useState<any[]>([])
   const [quizzes, setQuizzes] = useState<any[]>([])
   const [notes, setNotes] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [points, setPoints] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     load()
@@ -106,28 +115,27 @@ export function StudentDashboard({ user }: any) {
       (await supabase.from("user_totals").select("*").eq("user_id", user.id).single())
         .data
     )
+    setLoading(false)
   }
 
   const onQuizDone = () => {
-    confetti({
-      particleCount: 200,
-      spread: 120,
-      origin: { y: 0.6 },
-    })
-    alert("🎉 Giỏi lắm! Con đã hoàn thành bài quiz!")
+    winSound()
+    confetti({ particleCount: 150, spread: 120 })
     load()
   }
 
+  if (loading) return <p className="p-10">⏳ Đang tải...</p>
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-sky-50">
       {/* HEADER */}
       <header className="bg-white shadow sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-extrabold text-pink-600">🎒 EduCards</h1>
-          <div className="flex gap-4">
-            <Badge className="bg-yellow-200 text-yellow-800">
-              <Medal className="w-4 h-4 inline mr-1" />
-              {points?.total_score || 0}
+        <div className="flex justify-between items-center px-6 py-4">
+          <h1 className="text-3xl font-extrabold text-pink-500">🎈 EduKids</h1>
+
+          <div className="flex gap-4 items-center">
+            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-1 text-lg">
+              🏆 {points?.total_score || 0}
             </Badge>
             <Button
               variant="outline"
@@ -136,24 +144,24 @@ export function StudentDashboard({ user }: any) {
                 router.push("/")
               }}
             >
-              <LogOut className="w-4 h-4 mr-1" /> Thoát
+              <LogOut className="w-4 h-4 mr-1" /> Đăng xuất
             </Button>
           </div>
         </div>
       </header>
 
       {/* MENU */}
-      <div className="container mx-auto px-6 py-10">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
-          <Tile icon={BookOpen} label="Flashcards" onClick={() => setView("flashcards")} />
-          <Tile icon={Brain} label="Quizzes" onClick={() => setView("quizzes")} />
-          <Tile icon={FileText} label="Notes" onClick={() => setView("notes")} />
-          <Tile icon={TrendingUp} label="Progress" onClick={() => setView("progress")} />
-          <Tile icon={Gamepad2} label="Games" onClick={() => setView("games")} />
-          <Tile icon={Users} label="Classes" onClick={() => setView("classes")} />
-        </div>
+      <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+        <Tile title="Flashcard" icon={BookOpen} color="yellow" onClick={() => setView("flashcards")} />
+        <Tile title="Quiz" icon={Brain} color="pink" onClick={() => setView("quizzes")} />
+        <Tile title="Ghi chú" icon={FileText} color="green" onClick={() => setView("notes")} />
+        <Tile title="Tiến độ" icon={TrendingUp} color="purple" onClick={() => setView("progress")} />
+        <Tile title="Game" icon={Gamepad2} color="blue" onClick={() => setView("games")} />
+        <Tile title="Lớp học" icon={Users} color="cyan" onClick={() => setView("classes")} />
+      </div>
 
-        {/* CONTENT */}
+      {/* CONTENT */}
+      <div className="px-8 pb-20">
         {view === "flashcards" && <StudentFlashcards userId={user.id} />}
         {view === "quizzes" && (
           <StudentQuizzes quizzes={quizzes} onQuizComplete={onQuizDone} />
@@ -169,18 +177,28 @@ export function StudentDashboard({ user }: any) {
 
 /* ===================== TILE ===================== */
 
-function Tile({ icon: Icon, label, onClick }: any) {
+function Tile({ title, icon: Icon, color, onClick }: any) {
+  const colors: any = {
+    yellow: "from-yellow-200 to-yellow-400",
+    pink: "from-pink-200 to-pink-400",
+    green: "from-green-200 to-green-400",
+    purple: "from-purple-200 to-purple-400",
+    blue: "from-sky-200 to-sky-400",
+    cyan: "from-cyan-200 to-cyan-400",
+  }
+
   return (
     <div
-      onClick={onClick}
-      className="cursor-pointer bg-white rounded-3xl p-5 flex flex-col items-center gap-3
-                 hover:scale-110 transition shadow-lg"
+      onClick={() => {
+        clickSound()
+        onClick()
+      }}
+      className={`cursor-pointer rounded-3xl bg-gradient-to-br ${colors[color]}
+      p-6 flex flex-col items-center gap-3 text-white
+      shadow-lg hover:scale-110 transition`}
     >
-      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-yellow-400
-                      flex items-center justify-center text-white">
-        <Icon className="w-7 h-7" />
-      </div>
-      <p className="font-bold text-gray-700">{label}</p>
+      <Icon className="w-10 h-10" />
+      <p className="font-bold text-lg">{title}</p>
     </div>
   )
 }
