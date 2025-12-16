@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { StudentDashboard } from "@/components/student/dashboard"
 import { TeacherDashboard } from "@/components/teacher/dashboard"
 import { AdminDashboard } from "@/components/admin/dashboard" // 👈 thêm dòng này
+export const dynamic = "force-dynamic"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
