@@ -57,8 +57,6 @@ export default function SignUpPage() {
       body.avatar_url = avatarUrl
     }
 
-    console.log('📦 SEND PROFILE:', body)
-
     const res = await fetch('/api/internal/upsert-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,11 +94,7 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          // ⚠️ KHÔNG set avatar mặc định ở metadata
-          data: {
-            full_name: fullName,
-            role,
-          },
+          data: { full_name: fullName, role },
         },
       })
 
@@ -136,21 +130,18 @@ export default function SignUpPage() {
 
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
-
               {/* ===== AVATAR ===== */}
               <div>
                 <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   {AVATARS.map((a) => (
                     <div
                       key={a.id}
                       onClick={() => setAvatarUrl(a.url)}
                       className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition-all
-                        ${
-                          avatarUrl === a.url
-                            ? 'border-yellow-400 bg-yellow-50 scale-105'
-                            : 'border-gray-200 hover:border-pink-400 hover:bg-pink-50'
+                        ${avatarUrl === a.url
+                          ? 'border-yellow-400 bg-yellow-50 scale-105'
+                          : 'border-gray-200 hover:border-pink-400 hover:bg-pink-50'
                         }`}
                     >
                       <img src={a.url} className="w-16 h-16 mx-auto" />
@@ -158,7 +149,6 @@ export default function SignUpPage() {
                     </div>
                   ))}
                 </div>
-
                 {!avatarUrl && (
                   <p className="text-xs text-gray-500 mt-2">
                     Nếu không chọn, hệ thống sẽ dùng avatar mặc định
