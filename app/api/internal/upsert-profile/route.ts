@@ -10,8 +10,7 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false } }
 )
 
-const DEFAULT_AVATAR =
-  "https://cdn-icons-png.flaticon.com/512/616/616430.png"
+const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/616/616430.png"
 
 export async function POST(req: Request) {
   try {
@@ -22,15 +21,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing user id" }, { status: 400 })
     }
 
-    // 🔍 kiểm tra profile tồn tại chưa
-    const { data: existingProfile, error } = await supabaseAdmin
+    // 🔍 Kiểm tra profile đã tồn tại chưa
+    const { data: existingProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("id", id)
       .maybeSingle()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 })
     }
 
     // =========================
@@ -43,7 +42,7 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       }
 
-      // 🔥 QUAN TRỌNG: nếu frontend gửi avatar → UPDATE LUÔN
+      // 🔥 Cập nhật avatar nếu frontend gửi
       if (avatar_url) {
         updatePayload.avatar_url = avatar_url
       }
@@ -63,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     // =========================
-    // INSERT (HIẾM KHI XẢY RA)
+    // INSERT (PROFILE CHƯA TỒN TẠI)
     // =========================
     const { data, error: insertError } = await supabaseAdmin
       .from("profiles")

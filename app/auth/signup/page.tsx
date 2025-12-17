@@ -19,31 +19,11 @@ import {
 
 /* ================= AVATAR ================= */
 const AVATARS = [
-  {
-    id: 'dog',
-    name: 'Chó con 🐶',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
-  },
-  {
-    id: 'cat',
-    name: 'Mèo nhỏ 🐱',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png',
-  },
-  {
-    id: 'rabbit',
-    name: 'Thỏ trắng 🐰',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png',
-  },
-  {
-    id: 'bear',
-    name: 'Gấu nâu 🐻',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png',
-  },
-  {
-    id: 'lion',
-    name: 'Sư tử 🦁',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png',
-  },
+  { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
+  { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
+  { id: 'rabbit', name: 'Thỏ trắng 🐰', url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png' },
+  { id: 'bear', name: 'Gấu nâu 🐻', url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png' },
+  { id: 'lion', name: 'Sư tử 🦁', url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png' },
 ]
 
 export default function SignUpPage() {
@@ -79,11 +59,17 @@ export default function SignUpPage() {
 
     console.log('📦 SEND PROFILE:', body)
 
-    await fetch('/api/internal/upsert-profile', {
+    const res = await fetch('/api/internal/upsert-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+
+    if (!res.ok) {
+      const data = await res.json()
+      console.error('❌ Upsert profile failed:', data)
+      throw new Error(data?.error || 'Failed to upsert profile')
+    }
   }
 
   // ===============================
@@ -160,11 +146,11 @@ export default function SignUpPage() {
                     <div
                       key={a.id}
                       onClick={() => setAvatarUrl(a.url)}
-                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
+                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition-all
                         ${
                           avatarUrl === a.url
                             ? 'border-yellow-400 bg-yellow-50 scale-105'
-                            : 'border-transparent hover:bg-white'
+                            : 'border-gray-200 hover:border-pink-400 hover:bg-pink-50'
                         }`}
                     >
                       <img src={a.url} className="w-16 h-16 mx-auto" />
