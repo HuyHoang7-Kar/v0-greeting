@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -17,33 +17,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/* ================= AVATAR ĐỘNG VẬT (TRẺ EM) ================= */
 const AVATARS = [
-  {
-    id: 'dog',
-    name: 'Chó con 🐶',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
-  },
-  {
-    id: 'cat',
-    name: 'Mèo nhỏ 🐱',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png',
-  },
-  {
-    id: 'rabbit',
-    name: 'Thỏ trắng 🐰',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png',
-  },
-  {
-    id: 'bear',
-    name: 'Gấu nâu 🐻',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png',
-  },
-  {
-    id: 'lion',
-    name: 'Sư tử 🦁',
-    url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png',
-  },
+  { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
+  { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
+  { id: 'rabbit', name: 'Thỏ trắng 🐰', url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png' },
+  { id: 'bear', name: 'Gấu nâu 🐻', url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png' },
+  { id: 'lion', name: 'Sư tử 🦁', url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png' },
 ]
 
 export default function SignUpPage() {
@@ -56,31 +35,39 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
-  // 🔥 KHÔNG set avatar mặc định
-  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
+  // 🔥 Avatar state, mặc định chọn dog 🐶
+  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
-  async function serverUpsertProfile(opts: { id?: string }) {
-    const body: any = {
-      ...opts,
-      full_name: fullName,
-      role,
+  // ================= LƯU AVATAR RIÊNG =================
+  const handleSaveAvatar = async () => {
+    if (!userId) {
+      alert('Bạn cần tạo tài khoản trước khi lưu avatar')
+      return
     }
 
-    // ✅ CHỈ gửi avatar khi user đã chọn
-    if (avatarUrl) {
-      body.avatar_url = avatarUrl
+    try {
+      const res = await fetch('/api/internal/upsert-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, avatar_url: avatarUrl }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        alert('Avatar đã được lưu thành công!')
+      } else {
+        alert('Lưu avatar thất bại: ' + (data.error ?? data.message))
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert('Có lỗi khi lưu avatar')
     }
-
-    await fetch('/api/internal/upsert-profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
   }
 
+  // ================= SIGNUP FORM =================
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -105,8 +92,7 @@ export default function SignUpPage() {
           data: {
             full_name: fullName,
             role,
-            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
-            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            avatar_url: avatarUrl,
           },
         },
       })
@@ -117,7 +103,19 @@ export default function SignUpPage() {
       }
 
       if (data?.user?.id) {
-        await serverUpsertProfile({ id: data.user.id })
+        setUserId(data.user.id)
+        // Lưu avatar + profile ngay khi signup
+        await fetch('/api/internal/upsert-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            full_name: fullName,
+            role,
+            avatar_url: avatarUrl,
+            email,
+          }),
+        })
       }
 
       router.push('/auth/signup-success')
@@ -142,37 +140,38 @@ export default function SignUpPage() {
           </CardHeader>
 
           <CardContent>
-            <form onSubmit={handleSignUp} className="space-y-4">
-
-              {/* AVATAR */}
-              <div>
-                <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-                <div className="grid grid-cols-3 gap-3 mt-3">
-                  {AVATARS.map((a) => (
-                    <div
-                      key={a.id}
-                      onClick={() => setAvatarUrl(a.url)}
-                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
-                        ${
-                          avatarUrl === a.url
-                            ? 'border-yellow-400 bg-yellow-50 scale-105'
-                            : 'border-transparent hover:bg-white'
-                        }`}
-                    >
-                      <img src={a.url} className="w-16 h-16 mx-auto" />
-                      <p className="text-sm mt-1">{a.name}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* hint */}
-                {!avatarUrl && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Nếu không chọn, hệ thống sẽ dùng avatar mặc định
-                  </p>
-                )}
+            {/* AVATAR */}
+            <div className="mb-4">
+              <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                {AVATARS.map((a) => (
+                  <div
+                    key={a.id}
+                    onClick={() => setAvatarUrl(a.url)}
+                    className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
+                      ${
+                        avatarUrl === a.url
+                          ? 'border-yellow-400 bg-yellow-50 scale-105'
+                          : 'border-transparent hover:bg-white'
+                      }`}
+                  >
+                    <img src={a.url} className="w-16 h-16 mx-auto" />
+                    <p className="text-sm mt-1">{a.name}</p>
+                  </div>
+                ))}
               </div>
 
+              <Button
+                type="button"
+                className="mt-3 w-full bg-green-500 hover:bg-green-600 text-white text-sm rounded-xl"
+                onClick={handleSaveAvatar}
+              >
+                Lưu avatar
+              </Button>
+            </div>
+
+            {/* FORM SIGNUP */}
+            <form onSubmit={handleSignUp} className="space-y-4">
               <div>
                 <Label>Họ và tên</Label>
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
