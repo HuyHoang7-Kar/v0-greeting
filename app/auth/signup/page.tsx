@@ -27,7 +27,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [avatarId, setAvatarId] = useState(AVATARS[0].id) // quản lý avatar theo id
+  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -46,10 +46,9 @@ export default function SignUpPage() {
     }
 
     setIsLoading(true)
-    try {
-      const selectedAvatar = AVATARS.find(a => a.id === avatarId)?.url
 
-      // Signup
+    try {
+      // 1️⃣ Signup user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -62,10 +61,9 @@ export default function SignUpPage() {
         setError('Signup thất bại')
         return
       }
-
       const userId = signUpData.user.id
 
-      // Upsert profile
+      // 2️⃣ Upsert profile với full_name, role, avatar_url, email
       const res = await fetch('/api/internal/upsert-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,21 +71,11 @@ export default function SignUpPage() {
           id: userId,
           full_name: fullName,
           role,
-          avatar_url: selectedAvatar,
+          avatar_url: avatarUrl, // URL trực tiếp
           email,
         }),
       })
-
-      // ✅ parse JSON an toàn
-      let profileData: any
-      const text = await res.text()
-      try {
-        profileData = text ? JSON.parse(text) : {}
-      } catch (e) {
-        console.error('Response không phải JSON:', text)
-        profileData = {}
-      }
-
+      const profileData = await res.json()
       if (!profileData.ok) {
         console.warn('Lưu profile thất bại', profileData.error ?? profileData.message)
       }
@@ -113,11 +101,11 @@ export default function SignUpPage() {
             {/* AVATAR SELECT */}
             <div className="mb-4">
               <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-              <Select value={avatarId} onValueChange={v => setAvatarId(v)}>
+              <Select value={avatarUrl} onValueChange={v => setAvatarUrl(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {AVATARS.map(a => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <SelectItem key={a.id} value={a.url}>
                       <div className="flex items-center gap-2">
                         <img src={a.url} className="w-8 h-8 rounded-full" />
                         <span>{a.name}</span>
