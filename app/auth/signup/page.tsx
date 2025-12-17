@@ -17,13 +17,33 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/* ================= AVATAR ================= */
+/* ================= AVATAR ĐỘNG VẬT (TRẺ EM) ================= */
 const AVATARS = [
-  { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
-  { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
-  { id: 'rabbit', name: 'Thỏ trắng 🐰', url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png' },
-  { id: 'bear', name: 'Gấu nâu 🐻', url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png' },
-  { id: 'lion', name: 'Sư tử 🦁', url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png' },
+  {
+    id: 'dog',
+    name: 'Chó con 🐶',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
+  },
+  {
+    id: 'cat',
+    name: 'Mèo nhỏ 🐱',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png',
+  },
+  {
+    id: 'rabbit',
+    name: 'Thỏ trắng 🐰',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png',
+  },
+  {
+    id: 'bear',
+    name: 'Gấu nâu 🐻',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png',
+  },
+  {
+    id: 'lion',
+    name: 'Sư tử 🦁',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png',
+  },
 ]
 
 export default function SignUpPage() {
@@ -36,43 +56,31 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
-  // 🔥 avatar BAN ĐẦU = undefined (chưa chọn)
+  // 🔥 KHÔNG set avatar mặc định
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // ===============================
-  // 🔁 CALL BACKEND UPSERT PROFILE
-  // ===============================
-  async function serverUpsertProfile(userId: string) {
+  async function serverUpsertProfile(opts: { id?: string }) {
     const body: any = {
-      id: userId,
+      ...opts,
       full_name: fullName,
       role,
     }
 
-    // 👉 CHỈ gửi avatar nếu user đã chọn
+    // ✅ CHỈ gửi avatar khi user đã chọn
     if (avatarUrl) {
       body.avatar_url = avatarUrl
     }
 
-    const res = await fetch('/api/internal/upsert-profile', {
+    await fetch('/api/internal/upsert-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-
-    if (!res.ok) {
-      const data = await res.json()
-      console.error('❌ Upsert profile failed:', data)
-      throw new Error(data?.error || 'Failed to upsert profile')
-    }
   }
 
-  // ===============================
-  // 🚀 SIGN UP
-  // ===============================
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -94,7 +102,12 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          data: { full_name: fullName, role },
+          data: {
+            full_name: fullName,
+            role,
+            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
+            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+          },
         },
       })
 
@@ -104,7 +117,7 @@ export default function SignUpPage() {
       }
 
       if (data?.user?.id) {
-        await serverUpsertProfile(data.user.id)
+        await serverUpsertProfile({ id: data.user.id })
       }
 
       router.push('/auth/signup-success')
@@ -130,7 +143,8 @@ export default function SignUpPage() {
 
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
-              {/* ===== AVATAR ===== */}
+
+              {/* AVATAR */}
               <div>
                 <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
                 <div className="grid grid-cols-3 gap-3 mt-3">
@@ -138,10 +152,11 @@ export default function SignUpPage() {
                     <div
                       key={a.id}
                       onClick={() => setAvatarUrl(a.url)}
-                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition-all
-                        ${avatarUrl === a.url
-                          ? 'border-yellow-400 bg-yellow-50 scale-105'
-                          : 'border-gray-200 hover:border-pink-400 hover:bg-pink-50'
+                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
+                        ${
+                          avatarUrl === a.url
+                            ? 'border-yellow-400 bg-yellow-50 scale-105'
+                            : 'border-transparent hover:bg-white'
                         }`}
                     >
                       <img src={a.url} className="w-16 h-16 mx-auto" />
@@ -149,6 +164,8 @@ export default function SignUpPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* hint */}
                 {!avatarUrl && (
                   <p className="text-xs text-gray-500 mt-2">
                     Nếu không chọn, hệ thống sẽ dùng avatar mặc định
