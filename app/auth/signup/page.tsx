@@ -27,7 +27,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
+  const [avatarId, setAvatarId] = useState<string>(AVATARS[0].id) // chọn theo id
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,34 +35,38 @@ export default function SignUpPage() {
     e.preventDefault()
     setError(null)
 
-    if (password !== confirmPassword) {
-      setError('Mật khẩu không khớp')
-      return
-    }
-
-    if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
-      return
-    }
+    if (password !== confirmPassword) return setError('Mật khẩu không khớp')
+    if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự')
 
     setIsLoading(true)
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const selectedAvatar = AVATARS.find(a => a.id === avatarId)?.url
+      if (!selectedAvatar) return setError('Avatar không hợp lệ')
+
+      // Signup user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            role,
-            avatar_url: avatarUrl, // gửi avatar trực tiếp
-          },
-        },
       })
+      if (signUpError) return setError(signUpError.message)
+      if (!signUpData?.user?.id) return setError('Signup thất bại')
 
-      if (error) {
-        setError(error.message)
-        return
-      }
+      const userId = signUpData.user.id
+
+      // Gọi API backend để tạo profile + avatar
+      const res = await fetch('/api/internal/upsert-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userId,
+          full_name: fullName,
+          role,
+          avatar_url: selectedAvatar,
+          email,
+        }),
+      })
+      const profileData = await res.json()
+      if (!profileData.ok) console.warn('Lưu profile thất bại', profileData.error ?? profileData.message)
 
       router.push('/auth/signup-success')
     } catch (err: any) {
@@ -82,25 +86,22 @@ export default function SignUpPage() {
           </CardHeader>
 
           <CardContent>
-            {/* AVATAR */}
+            {/* AVATAR SELECT */}
             <div className="mb-4">
               <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                {AVATARS.map(a => (
-                  <div
-                    key={a.id}
-                    onClick={() => setAvatarUrl(a.url)}
-                    className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition ${
-                      avatarUrl === a.url
-                        ? 'border-yellow-400 bg-yellow-50 scale-105'
-                        : 'border-transparent hover:bg-white'
-                    }`}
-                  >
-                    <img src={a.url} className="w-16 h-16 mx-auto" />
-                    <p className="text-sm mt-1">{a.name}</p>
-                  </div>
-                ))}
-              </div>
+              <Select value={avatarId} onValueChange={(v: string) => setAvatarId(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {AVATARS.map(a => (
+                    <SelectItem key={a.id} value={a.id}>
+                      <div className="flex items-center gap-2">
+                        <img src={a.url} className="w-8 h-8 rounded-full" />
+                        <span>{a.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* SIGNUP FORM */}
