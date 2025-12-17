@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/* ================= AVATAR ĐỘNG VẬT (TRẺ EM) ================= */
+/* ================= AVATAR ================= */
 const AVATARS = [
   {
     id: 'dog',
@@ -56,23 +56,28 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
-  // 🔥 KHÔNG set avatar mặc định
+  // 🔥 avatar BAN ĐẦU = undefined (chưa chọn)
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  async function serverUpsertProfile(opts: { id?: string }) {
+  // ===============================
+  // 🔁 CALL BACKEND UPSERT PROFILE
+  // ===============================
+  async function serverUpsertProfile(userId: string) {
     const body: any = {
-      ...opts,
+      id: userId,
       full_name: fullName,
       role,
     }
 
-    // ✅ CHỈ gửi avatar khi user đã chọn
+    // 👉 CHỈ gửi avatar nếu user đã chọn
     if (avatarUrl) {
       body.avatar_url = avatarUrl
     }
+
+    console.log('📦 SEND PROFILE:', body)
 
     await fetch('/api/internal/upsert-profile', {
       method: 'POST',
@@ -81,6 +86,9 @@ export default function SignUpPage() {
     })
   }
 
+  // ===============================
+  // 🚀 SIGN UP
+  // ===============================
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -102,11 +110,10 @@ export default function SignUpPage() {
         email,
         password,
         options: {
+          // ⚠️ KHÔNG set avatar mặc định ở metadata
           data: {
             full_name: fullName,
             role,
-            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
-            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           },
         },
       })
@@ -117,7 +124,7 @@ export default function SignUpPage() {
       }
 
       if (data?.user?.id) {
-        await serverUpsertProfile({ id: data.user.id })
+        await serverUpsertProfile(data.user.id)
       }
 
       router.push('/auth/signup-success')
@@ -144,9 +151,10 @@ export default function SignUpPage() {
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
 
-              {/* AVATAR */}
+              {/* ===== AVATAR ===== */}
               <div>
                 <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
+
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   {AVATARS.map((a) => (
                     <div
@@ -165,7 +173,6 @@ export default function SignUpPage() {
                   ))}
                 </div>
 
-                {/* hint */}
                 {!avatarUrl && (
                   <p className="text-xs text-gray-500 mt-2">
                     Nếu không chọn, hệ thống sẽ dùng avatar mặc định
