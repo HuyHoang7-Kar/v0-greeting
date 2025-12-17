@@ -27,7 +27,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [avatarId, setAvatarId] = useState<string>(AVATARS[0].id) // chọn theo id
+  const [avatarId, setAvatarId] = useState(AVATARS[0].id) // quản lý avatar theo id
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,25 +35,37 @@ export default function SignUpPage() {
     e.preventDefault()
     setError(null)
 
-    if (password !== confirmPassword) return setError('Mật khẩu không khớp')
-    if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự')
+    if (password !== confirmPassword) {
+      setError('Mật khẩu không khớp')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự')
+      return
+    }
 
     setIsLoading(true)
     try {
       const selectedAvatar = AVATARS.find(a => a.id === avatarId)?.url
-      if (!selectedAvatar) return setError('Avatar không hợp lệ')
 
-      // Signup user
+      // Signup
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       })
-      if (signUpError) return setError(signUpError.message)
-      if (!signUpData?.user?.id) return setError('Signup thất bại')
+      if (signUpError) {
+        setError(signUpError.message)
+        return
+      }
+      if (!signUpData?.user?.id) {
+        setError('Signup thất bại')
+        return
+      }
 
       const userId = signUpData.user.id
 
-      // Gọi API backend để tạo profile + avatar
+      // Upsert profile
       const res = await fetch('/api/internal/upsert-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,8 +77,20 @@ export default function SignUpPage() {
           email,
         }),
       })
-      const profileData = await res.json()
-      if (!profileData.ok) console.warn('Lưu profile thất bại', profileData.error ?? profileData.message)
+
+      // ✅ parse JSON an toàn
+      let profileData: any
+      const text = await res.text()
+      try {
+        profileData = text ? JSON.parse(text) : {}
+      } catch (e) {
+        console.error('Response không phải JSON:', text)
+        profileData = {}
+      }
+
+      if (!profileData.ok) {
+        console.warn('Lưu profile thất bại', profileData.error ?? profileData.message)
+      }
 
       router.push('/auth/signup-success')
     } catch (err: any) {
@@ -89,7 +113,7 @@ export default function SignUpPage() {
             {/* AVATAR SELECT */}
             <div className="mb-4">
               <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-              <Select value={avatarId} onValueChange={(v: string) => setAvatarId(v)}>
+              <Select value={avatarId} onValueChange={v => setAvatarId(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {AVATARS.map(a => (
