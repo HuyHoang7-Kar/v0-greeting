@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// 🔐 Supabase Admin (Service Role)
 const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
     auth: { persistSession: false },
   }
@@ -15,8 +11,6 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    const payload = await req.json()
-
     const {
       id,
       email,
@@ -29,116 +23,42 @@ export async function POST(req: Request) {
       full_name?: string
       role?: string
       avatar_url?: string
-    } = payload
+    } = await req.json()
 
     // ===============================
-    // 1️⃣ XÁC ĐỊNH USER ID
+    // 1️⃣ VALIDATION – BẮT BUỘC CÓ USER ID
     // ===============================
-    let userId = id
-
-    if (!userId && email) {
-      const { data: foundUser, error } = await supabaseAdmin
-        .from("auth.users")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      if (!foundUser?.id) {
-        return NextResponse.json(
-          { ok: false, message: "user-not-found-yet" },
-          { status: 202 }
-        )
-      }
-
-      userId = foundUser.id
-    }
-
-    if (!userId) {
+    if (!id) {
       return NextResponse.json(
-        { error: "must provide user id or email" },
+        { error: "missing user id" },
         { status: 400 }
       )
     }
 
     // ===============================
-    // 2️⃣ KIỂM TRA PROFILE ĐÃ TỒN TẠI CHƯA
+    // 2️⃣ UPSERT PROFILE (1 LỆNH DUY NHẤT)
     // ===============================
-    const { data: existingProfile, error: profileError } =
-      await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle()
-
-    if (profileError) {
-      return NextResponse.json(
-        { error: profileError.message },
-        { status: 500 }
-      )
-    }
-
-    // ===============================
-    // 3️⃣ PROFILE ĐÃ TỒN TẠI → UPDATE
-    // ===============================
-    if (existingProfile) {
-      const updatePayload: any = {
-        full_name,
-        role,
-        updated_at: new Date().toISOString(),
-      }
-
-      // ✅ CHỈ update avatar KHI frontend gửi
-      if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
-        updatePayload.avatar_url = avatar_url
-      }
-
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .update(updatePayload)
-        .eq("id", userId)
-        .select()
-        .single()
-
-      if (error) {
-        console.error("Update profile error:", error)
-        return NextResponse.json(
-          { error: error.message },
-          { status: 500 }
-        )
-      }
-
-      return NextResponse.json({ ok: true, profile: data })
-    }
-
-    // ===============================
-    // 4️⃣ PROFILE CHƯA TỒN TẠI → INSERT
-    // ===============================
-    const insertPayload: any = {
-      id: userId,
+    const payload: any = {
+      id,
       email,
       full_name,
       role,
-      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    // ✅ KHÔNG ÉP avatar
+    // 👉 CHỈ GHI avatar KHI FRONTEND GỬI
     if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
-      insertPayload.avatar_url = avatar_url
+      payload.avatar_url = avatar_url
     }
 
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .insert(insertPayload)
+      .upsert(payload, { onConflict: "id" })
       .select()
       .single()
 
     if (error) {
-      console.error("Insert profile error:", error)
+      console.error("Upsert profile error:", error)
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
@@ -148,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, profile: data })
 
   } catch (err: any) {
-    console.error("Internal upsert-profile error:", err)
+    console.error("upsert-profile fatal error:", err)
     return NextResponse.json(
       { error: String(err) },
       { status: 500 }

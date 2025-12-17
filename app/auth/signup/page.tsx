@@ -74,7 +74,7 @@ export default function SignUpPage() {
       body.avatar_url = avatarUrl
     }
 
-    await fetch('/api/internal/upsert-profile', {
+    await fetch('app/api/internal/upsert-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
