@@ -10,19 +10,6 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false } }
 )
 
-// 🧸 Avatar hoạt hình trung tính – phù hợp trẻ em
-const DEFAULT_AVATARS = [
-  "/avatars/animal-lion.png",
-  "/avatars/animal-elephant.png",
-  "/avatars/animal-panda.png",
-  "/avatars/animal-dolphin.png",
-  "/avatars/animal-bear.png",
-]
-
-function getRandomAvatar() {
-  return DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)]
-}
-
 export async function POST(req: Request) {
   try {
     const payload = await req.json()
@@ -72,7 +59,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔎 Kiểm tra profile đã tồn tại chưa
+    // 🔎 Lấy profile hiện tại
     const { data: existingProfile, error: profileError } =
       await supabaseAdmin
         .from("profiles")
@@ -87,24 +74,29 @@ export async function POST(req: Request) {
       )
     }
 
-    // 👉 Xác định avatar cuối cùng
-    const finalAvatar =
-      avatar_url ||
-      existingProfile?.avatar_url ||
-      getRandomAvatar()
-
     // ===============================
-    // ✅ CASE 1: PROFILE ĐÃ TỒN TẠI → UPDATE
+    // ✅ CASE 1: PROFILE ĐÃ TỒN TẠI
     // ===============================
     if (existingProfile) {
+      const updatePayload: any = {
+        full_name,
+        role,
+        updated_at: new Date().toISOString(),
+      }
+
+      // 🔥 CHỈ SET AVATAR 1 LẦN DUY NHẤT
+      if (
+        (!existingProfile.avatar_url ||
+          existingProfile.avatar_url.trim() === "") &&
+        typeof avatar_url === "string" &&
+        avatar_url.trim() !== ""
+      ) {
+        updatePayload.avatar_url = avatar_url
+      }
+
       const { data, error } = await supabaseAdmin
         .from("profiles")
-        .update({
-          full_name,
-          role,
-          avatar_url: finalAvatar,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", userId)
         .select()
         .single()
@@ -121,8 +113,15 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI → INSERT
+    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI (HIẾM)
     // ===============================
+    if (!avatar_url || avatar_url.trim() === "") {
+      return NextResponse.json(
+        { error: "avatar-required-on-signup" },
+        { status: 400 }
+      )
+    }
+
     const { data, error } = await supabaseAdmin
       .from("profiles")
       .insert({
@@ -130,7 +129,7 @@ export async function POST(req: Request) {
         email,
         full_name,
         role,
-        avatar_url: finalAvatar,
+        avatar_url,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
