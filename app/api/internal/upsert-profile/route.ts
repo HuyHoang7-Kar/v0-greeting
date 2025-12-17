@@ -4,11 +4,9 @@ import { createClient } from "@supabase/supabase-js"
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } }
-)
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+})
 
 const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/616/616430.png"
 
@@ -21,68 +19,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing user id" }, { status: 400 })
     }
 
-    // 🔍 Kiểm tra profile đã tồn tại chưa
-    const { data: existingProfile, error: profileError } = await supabaseAdmin
+    // UPSERT: update nếu tồn tại, insert nếu chưa
+    const { data, error } = await supabaseAdmin
       .from("profiles")
-      .select("id")
-      .eq("id", id)
-      .maybeSingle()
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 })
-    }
-
-    // =========================
-    // UPDATE (PROFILE ĐÃ TỒN TẠI)
-    // =========================
-    if (existingProfile) {
-      const updatePayload: any = {
-        full_name,
-        role,
-        updated_at: new Date().toISOString(),
-      }
-
-      // 🔥 Cập nhật avatar nếu frontend gửi
-      if (avatar_url) {
-        updatePayload.avatar_url = avatar_url
-      }
-
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .update(updatePayload)
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      return NextResponse.json({ ok: true, profile: data })
-    }
-
-    // =========================
-    // INSERT (PROFILE CHƯA TỒN TẠI)
-    // =========================
-    const { data, error: insertError } = await supabaseAdmin
-      .from("profiles")
-      .insert({
-        id,
-        email,
-        full_name,
-        role,
-        avatar_url: avatar_url || DEFAULT_AVATAR,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .upsert(
+        {
+          id,
+          email,
+          full_name,
+          role,
+          avatar_url: avatar_url || DEFAULT_AVATAR,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" } // profile đã tồn tại sẽ update
+      )
       .select()
-      .single()
+      .maybeSingle() // luôn trả về null hoặc object, tránh crash
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, profile: data })
+    return NextResponse.json({ ok: true, profile: data ?? null })
   } catch (err: any) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
