@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -17,26 +17,30 @@ export async function POST(req: Request) {
 
     if (!id) {
       return NextResponse.json(
-        { ok: false, error: "missing-user-id" },
+        { ok: false, error: 'Missing user id' },
         { status: 400 }
       )
     }
 
-    // 1️⃣ Check profile tồn tại chưa
-    const { data: existingProfile, error: checkError } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", id)
-      .maybeSingle()
+    /* 🔎 Check existing profile */
+    const { data: existingProfile, error: selectError } =
+      await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle()
 
-    if (checkError) {
-      return NextResponse.json({ ok: false, error: checkError.message }, { status: 500 })
+    if (selectError) {
+      return NextResponse.json(
+        { ok: false, error: selectError.message },
+        { status: 500 }
+      )
     }
 
-    // 2️⃣ INSERT nếu chưa có
+    /* 🆕 INSERT */
     if (!existingProfile) {
       const { data, error } = await supabaseAdmin
-        .from("profiles")
+        .from('profiles')
         .insert({
           id,
           email,
@@ -48,34 +52,39 @@ export async function POST(req: Request) {
         .single()
 
       if (error) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+        return NextResponse.json(
+          { ok: false, error: error.message },
+          { status: 500 }
+        )
       }
 
       return NextResponse.json({ ok: true, profile: data })
     }
 
-    // 3️⃣ UPDATE nếu đã có
+    /* ♻️ UPDATE */
     const { data, error } = await supabaseAdmin
-      .from("profiles")
+      .from('profiles')
       .update({
-        email,
         full_name,
         role,
         avatar_url,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", id)
+      .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ ok: true, profile: data })
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err.message ?? String(err) },
+      { ok: false, error: String(err) },
       { status: 500 }
     )
   }
