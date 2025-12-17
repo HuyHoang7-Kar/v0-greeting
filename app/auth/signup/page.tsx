@@ -32,10 +32,11 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
 
-  // Khi user click chọn avatar → nếu đã có userId thì lưu luôn
+  // 🔥 Khi chọn avatar → lưu ngay nếu đã có userId
   const handleSelectAvatar = async (url: string) => {
     setAvatarUrl(url)
-    if (!userId) return // chưa signup, chờ signup xong lưu cùng profile
+
+    if (!userId) return // chưa signup → chờ lưu sau
 
     try {
       const res = await fetch('/api/internal/upsert-profile', {
@@ -65,9 +66,11 @@ export default function SignUpPage() {
       })
 
       if (error) return setError(error.message)
+
       if (data?.user?.id) {
         setUserId(data.user.id)
-        // Signup thành công → lưu profile + avatar
+
+        // 🔹 Signup thành công → lưu profile + avatar
         await fetch('/api/internal/upsert-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
