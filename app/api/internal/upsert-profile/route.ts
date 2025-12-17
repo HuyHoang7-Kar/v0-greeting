@@ -10,41 +10,32 @@ const supabaseAdmin = createClient(
   { auth: { persistSession: false } }
 )
 
-const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/616/616430.png' // 🐶 mặc định
+const DEFAULT_AVATAR =
+  "https://cdn-icons-png.flaticon.com/512/616/616430.png"
 
 export async function POST(req: Request) {
   try {
     const payload = await req.json()
     const { id, email, full_name, role, avatar_url } = payload
 
-    if (!id && !email) {
-      return NextResponse.json({ error: "must provide user id or email" }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: "Missing user id" }, { status: 400 })
     }
 
-    // Lấy userId từ email nếu chưa có
-    let userId = id
-    if (!userId && email) {
-      const { data: foundUser, error } = await supabaseAdmin
-        .from("auth.users")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle()
-
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      if (!foundUser?.id) return NextResponse.json({ ok: false, message: "user-not-found-yet" }, { status: 202 })
-      userId = foundUser.id
-    }
-
-    // Lấy profile hiện tại
-    const { data: existingProfile, error: profileError } = await supabaseAdmin
+    // 🔍 kiểm tra profile tồn tại chưa
+    const { data: existingProfile, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, avatar_url")
-      .eq("id", userId)
+      .select("id")
+      .eq("id", id)
       .maybeSingle()
 
-    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    // Nếu profile tồn tại → UPDATE
+    // =========================
+    // UPDATE (PROFILE ĐÃ TỒN TẠI)
+    // =========================
     if (existingProfile) {
       const updatePayload: any = {
         full_name,
@@ -52,42 +43,47 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       }
 
-      // Chỉ set avatar nếu chưa có
-      if (!existingProfile.avatar_url && avatar_url) {
+      // 🔥 QUAN TRỌNG: nếu frontend gửi avatar → UPDATE LUÔN
+      if (avatar_url) {
         updatePayload.avatar_url = avatar_url
       }
 
       const { data, error } = await supabaseAdmin
         .from("profiles")
         .update(updatePayload)
-        .eq("id", userId)
+        .eq("id", id)
         .select()
         .single()
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
       return NextResponse.json({ ok: true, profile: data })
     }
 
-    // Nếu profile chưa tồn tại → INSERT
-    const finalAvatar = avatar_url || DEFAULT_AVATAR
-
-    const { data, error } = await supabaseAdmin
+    // =========================
+    // INSERT (HIẾM KHI XẢY RA)
+    // =========================
+    const { data, error: insertError } = await supabaseAdmin
       .from("profiles")
       .insert({
-        id: userId,
+        id,
         email,
         full_name,
         role,
-        avatar_url: finalAvatar,
+        avatar_url: avatar_url || DEFAULT_AVATAR,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true, profile: data })
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
 
+    return NextResponse.json({ ok: true, profile: data })
   } catch (err: any) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
