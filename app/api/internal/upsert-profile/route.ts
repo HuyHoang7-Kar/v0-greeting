@@ -31,11 +31,11 @@ export async function POST(req: Request) {
       avatar_url?: string
     } = payload
 
+    // ===============================
+    // 1️⃣ XÁC ĐỊNH USER ID
+    // ===============================
     let userId = id
 
-    // ===============================
-    // 🔍 TÌM USER THEO EMAIL (NẾU CHƯA CÓ ID)
-    // ===============================
     if (!userId && email) {
       const { data: foundUser, error } = await supabaseAdmin
         .from("auth.users")
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // 🔎 LẤY PROFILE HIỆN TẠI
+    // 2️⃣ KIỂM TRA PROFILE ĐÃ TỒN TẠI CHƯA
     // ===============================
     const { data: existingProfile, error: profileError } =
       await supabaseAdmin
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // ✅ CASE 1: PROFILE ĐÃ TỒN TẠI
+    // 3️⃣ PROFILE ĐÃ TỒN TẠI → UPDATE
     // ===============================
     if (existingProfile) {
       const updatePayload: any = {
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       }
 
-      // 🔥 LUÔN ƯU TIÊN AVATAR USER CHỌN
+      // ✅ CHỈ update avatar KHI frontend gửi
       if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
         updatePayload.avatar_url = avatar_url
       }
@@ -115,26 +115,25 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI
+    // 4️⃣ PROFILE CHƯA TỒN TẠI → INSERT
     // ===============================
-    if (!avatar_url || avatar_url.trim() === "") {
-      return NextResponse.json(
-        { error: "avatar-required-on-signup" },
-        { status: 400 }
-      )
+    const insertPayload: any = {
+      id: userId,
+      email,
+      full_name,
+      role,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // ✅ KHÔNG ÉP avatar
+    if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
+      insertPayload.avatar_url = avatar_url
     }
 
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        id: userId,
-        email,
-        full_name,
-        role,
-        avatar_url,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -147,6 +146,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, profile: data })
+
   } catch (err: any) {
     console.error("Internal upsert-profile error:", err)
     return NextResponse.json(
