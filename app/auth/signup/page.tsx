@@ -30,58 +30,38 @@ export default function SignUpPage() {
   const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-
-  // 🔥 Khi chọn avatar → lưu ngay nếu đã có userId
-  const handleSelectAvatar = async (url: string) => {
-    setAvatarUrl(url)
-
-    if (!userId) return // chưa signup → chờ lưu sau
-
-    try {
-      const res = await fetch('/api/internal/upsert-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, avatar_url: url }),
-      })
-      const data = await res.json()
-      if (!data.ok) console.warn('Lưu avatar thất bại', data.error ?? data.message)
-    } catch (err) {
-      console.error('Lỗi lưu avatar', err)
-    }
-  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (password !== confirmPassword) return setError('Mật khẩu không khớp')
-    if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự')
+
+    if (password !== confirmPassword) {
+      setError('Mật khẩu không khớp')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự')
+      return
+    }
 
     setIsLoading(true)
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName, role, avatar_url: avatarUrl } },
-      })
-
-      if (error) return setError(error.message)
-
-      if (data?.user?.id) {
-        setUserId(data.user.id)
-
-        // 🔹 Signup thành công → lưu profile + avatar
-        await fetch('/api/internal/upsert-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: data.user.id,
+        options: {
+          data: {
             full_name: fullName,
             role,
-            avatar_url: avatarUrl,
-            email,
-          }),
-        })
+            avatar_url: avatarUrl, // gửi avatar trực tiếp
+          },
+        },
+      })
+
+      if (error) {
+        setError(error.message)
+        return
       }
 
       router.push('/auth/signup-success')
@@ -109,7 +89,7 @@ export default function SignUpPage() {
                 {AVATARS.map(a => (
                   <div
                     key={a.id}
-                    onClick={() => handleSelectAvatar(a.url)}
+                    onClick={() => setAvatarUrl(a.url)}
                     className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition ${
                       avatarUrl === a.url
                         ? 'border-yellow-400 bg-yellow-50 scale-105'
