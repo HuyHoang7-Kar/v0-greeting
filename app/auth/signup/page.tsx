@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -40,32 +40,6 @@ export default function SignUpPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-
-  // ================= LƯU AVATAR RIÊNG =================
-  const handleSaveAvatar = async () => {
-    if (!userId) {
-      alert('Bạn cần tạo tài khoản trước khi lưu avatar')
-      return
-    }
-
-    try {
-      const res = await fetch('/api/internal/upsert-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: userId, avatar_url: avatarUrl }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        alert('Avatar đã được lưu thành công!')
-      } else {
-        alert('Lưu avatar thất bại: ' + (data.error ?? data.message))
-      }
-    } catch (err: any) {
-      console.error(err)
-      alert('Có lỗi khi lưu avatar')
-    }
-  }
 
   // ================= SIGNUP FORM =================
   const handleSignUp = async (e: React.FormEvent) => {
@@ -92,6 +66,7 @@ export default function SignUpPage() {
           data: {
             full_name: fullName,
             role,
+            // ⚠️ gửi avatar ngay lúc signup
             avatar_url: avatarUrl,
           },
         },
@@ -103,21 +78,28 @@ export default function SignUpPage() {
       }
 
       if (data?.user?.id) {
-        setUserId(data.user.id)
-        // Lưu avatar + profile ngay khi signup
-        await fetch('/api/internal/upsert-profile', {
+        const userId = data.user.id
+
+        // 🔹 Lưu profile + avatar ngay khi signup
+        const res = await fetch('/api/internal/upsert-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: data.user.id,
+            id: userId,
             full_name: fullName,
             role,
             avatar_url: avatarUrl,
             email,
           }),
         })
+
+        const result = await res.json()
+        if (!result.ok) {
+          console.error('Lưu profile thất bại:', result)
+        }
       }
 
+      // Chuyển tới trang thành công hoặc dashboard
       router.push('/auth/signup-success')
     } catch (err: any) {
       setError(err.message ?? 'Có lỗi xảy ra')
@@ -160,14 +142,6 @@ export default function SignUpPage() {
                   </div>
                 ))}
               </div>
-
-              <Button
-                type="button"
-                className="mt-3 w-full bg-green-500 hover:bg-green-600 text-white text-sm rounded-xl"
-                onClick={handleSaveAvatar}
-              >
-                Lưu avatar
-              </Button>
             </div>
 
             {/* FORM SIGNUP */}
