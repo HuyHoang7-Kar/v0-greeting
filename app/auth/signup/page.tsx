@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,15 +27,15 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [userId, setUserId] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
-  // 🔥 Lưu avatar tự động khi click
+  // Khi user click chọn avatar → nếu đã có userId thì lưu luôn
   const handleSelectAvatar = async (url: string) => {
     setAvatarUrl(url)
-    if (!userId) return // nếu user chưa tạo xong thì không lưu
+    if (!userId) return // chưa signup, chờ signup xong lưu cùng profile
 
     try {
       const res = await fetch('/api/internal/upsert-profile', {
@@ -44,40 +44,30 @@ export default function SignUpPage() {
         body: JSON.stringify({ id: userId, avatar_url: url }),
       })
       const data = await res.json()
-      if (!data.ok) console.error('Lưu avatar thất bại', data)
+      if (!data.ok) console.warn('Lưu avatar thất bại', data.error ?? data.message)
     } catch (err) {
-      console.error('Lỗi khi lưu avatar', err)
+      console.error('Lỗi lưu avatar', err)
     }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
-    if (password !== confirmPassword) {
-      setError('Mật khẩu không khớp')
-      return
-    }
-    if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
-      return
-    }
+    if (password !== confirmPassword) return setError('Mật khẩu không khớp')
+    if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự')
 
     setIsLoading(true)
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName, role, avatar_url: avatarUrl },
-        },
+        options: { data: { full_name: fullName, role, avatar_url: avatarUrl } },
       })
 
       if (error) return setError(error.message)
-
       if (data?.user?.id) {
         setUserId(data.user.id)
-        // Lưu profile ban đầu
+        // Signup thành công → lưu profile + avatar
         await fetch('/api/internal/upsert-profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -105,7 +95,7 @@ export default function SignUpPage() {
         <Card className="shadow-2xl border-0 rounded-3xl">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-extrabold text-pink-500">Học tập cùng Flashcard 🎒</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">Chọn nhân vật và bắt đầu học nhé!</CardDescription>
+            <CardDescription className="text-gray-600 mt-2">Chọn nhân vật và đăng ký tài khoản</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -113,12 +103,15 @@ export default function SignUpPage() {
             <div className="mb-4">
               <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
               <div className="grid grid-cols-3 gap-3 mt-3">
-                {AVATARS.map((a) => (
+                {AVATARS.map(a => (
                   <div
                     key={a.id}
                     onClick={() => handleSelectAvatar(a.url)}
-                    className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
-                      ${avatarUrl === a.url ? 'border-yellow-400 bg-yellow-50 scale-105' : 'border-transparent hover:bg-white'}`}
+                    className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition ${
+                      avatarUrl === a.url
+                        ? 'border-yellow-400 bg-yellow-50 scale-105'
+                        : 'border-transparent hover:bg-white'
+                    }`}
                   >
                     <img src={a.url} className="w-16 h-16 mx-auto" />
                     <p className="text-sm mt-1">{a.name}</p>
@@ -127,24 +120,22 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* FORM SIGNUP */}
+            {/* SIGNUP FORM */}
             <form onSubmit={handleSignUp} className="space-y-4">
               <div>
                 <Label>Họ và tên</Label>
-                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                <Input value={fullName} onChange={e => setFullName(e.target.value)} required />
               </div>
 
               <div>
                 <Label>Email</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
 
               <div>
                 <Label>Vai trò</Label>
                 <Select value={role} onValueChange={(v: any) => setRole(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học sinh</SelectItem>
                     <SelectItem value="teacher">Giáo viên</SelectItem>
@@ -155,12 +146,12 @@ export default function SignUpPage() {
 
               <div>
                 <Label>Mật khẩu</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
 
               <div>
                 <Label>Xác nhận mật khẩu</Label>
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -171,8 +162,7 @@ export default function SignUpPage() {
             </form>
 
             <p className="text-center text-sm mt-4">
-              Đã có tài khoản?{' '}
-              <Link href="/auth/login" className="text-pink-500 font-semibold">Đăng nhập</Link>
+              Đã có tài khoản? <Link href="/auth/login" className="text-pink-500 font-semibold">Đăng nhập</Link>
             </p>
           </CardContent>
         </Card>
