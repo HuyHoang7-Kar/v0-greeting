@@ -4,12 +4,22 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
+/* =======================
+   AVATAR LIST
+======================= */
 const AVATARS = [
   { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
   { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
@@ -22,15 +32,22 @@ export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  /* =======================
+     FORM STATE
+  ======================= */
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
   const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
+
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  /* =======================
+     SUBMIT HANDLER
+  ======================= */
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -48,38 +65,49 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      // 1️⃣ Signup user
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      /* 1️⃣ SIGN UP AUTH */
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       })
+
       if (signUpError) {
         setError(signUpError.message)
         return
       }
-      if (!signUpData?.user?.id) {
-        setError('Signup thất bại')
+
+      const userId = data?.user?.id
+      if (!userId) {
+        setError('Không lấy được user id')
         return
       }
-      const userId = signUpData.user.id
 
-      // 2️⃣ Upsert profile với full_name, role, avatar_url, email
+      /* 2️⃣ UPSERT PROFILE */
       const res = await fetch('/api/internal/upsert-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: userId,
+          email,
           full_name: fullName,
           role,
-          avatar_url: avatarUrl, // URL trực tiếp
-          email,
+          avatar_url: avatarUrl,
         }),
       })
-      const profileData = await res.json()
-      if (!profileData.ok) {
-        console.warn('Lưu profile thất bại', profileData.error ?? profileData.message)
+
+      let result: any = null
+      try {
+        result = await res.json()
+      } catch {
+        throw new Error('Backend không trả JSON')
       }
 
+      if (!res.ok || !result?.ok) {
+        console.error('Profile error:', result)
+        throw new Error('Lưu thông tin người dùng thất bại')
+      }
+
+      /* 3️⃣ SUCCESS */
       router.push('/auth/signup-success')
     } catch (err: any) {
       setError(err.message ?? 'Có lỗi xảy ra')
@@ -88,23 +116,32 @@ export default function SignUpPage() {
     }
   }
 
+  /* =======================
+     UI
+  ======================= */
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-sky-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <Card className="shadow-2xl border-0 rounded-3xl">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-extrabold text-pink-500">Học tập cùng Flashcard 🎒</CardTitle>
-            <CardDescription className="text-gray-600 mt-2">Chọn nhân vật và đăng ký tài khoản</CardDescription>
+            <CardTitle className="text-3xl font-extrabold text-pink-500">
+              Học tập cùng Flashcard 🎒
+            </CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Chọn nhân vật và đăng ký tài khoản
+            </CardDescription>
           </CardHeader>
 
           <CardContent>
             {/* AVATAR SELECT */}
             <div className="mb-4">
               <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-              <Select value={avatarUrl} onValueChange={v => setAvatarUrl(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={avatarUrl} onValueChange={setAvatarUrl}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {AVATARS.map(a => (
+                  {AVATARS.map((a) => (
                     <SelectItem key={a.id} value={a.url}>
                       <div className="flex items-center gap-2">
                         <img src={a.url} className="w-8 h-8 rounded-full" />
@@ -116,22 +153,33 @@ export default function SignUpPage() {
               </Select>
             </div>
 
-            {/* SIGNUP FORM */}
+            {/* FORM */}
             <form onSubmit={handleSignUp} className="space-y-4">
               <div>
                 <Label>Họ và tên</Label>
-                <Input value={fullName} onChange={e => setFullName(e.target.value)} required />
+                <Input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
               </div>
 
               <div>
                 <Label>Email</Label>
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
 
               <div>
                 <Label>Vai trò</Label>
                 <Select value={role} onValueChange={(v: any) => setRole(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học sinh</SelectItem>
                     <SelectItem value="teacher">Giáo viên</SelectItem>
@@ -142,23 +190,40 @@ export default function SignUpPage() {
 
               <div>
                 <Label>Mật khẩu</Label>
-                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
 
               <div>
                 <Label>Xác nhận mật khẩu</Label>
-                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
 
-              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-white text-lg rounded-xl" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white text-lg rounded-xl"
+                disabled={isLoading}
+              >
                 {isLoading ? 'Đang tạo...' : 'Bắt đầu học 🚀'}
               </Button>
             </form>
 
             <p className="text-center text-sm mt-4">
-              Đã có tài khoản? <Link href="/auth/login" className="text-pink-500 font-semibold">Đăng nhập</Link>
+              Đã có tài khoản?{' '}
+              <Link href="/auth/login" className="text-pink-500 font-semibold">
+                Đăng nhập
+              </Link>
             </p>
           </CardContent>
         </Card>

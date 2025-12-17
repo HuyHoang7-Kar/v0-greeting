@@ -4,90 +4,79 @@ import { createClient } from "@supabase/supabase-js"
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-})
+const supabaseAdmin = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false } }
+)
 
 export async function POST(req: Request) {
   try {
-    const payload = await req.json()
-    const { id, email, full_name, role, avatar_url } = payload as {
-      id?: string
-      email?: string
-      full_name?: string
-      role?: string
-      avatar_url?: string
+    const body = await req.json()
+    const { id, email, full_name, role, avatar_url } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { ok: false, error: "missing-user-id" },
+        { status: 400 }
+      )
     }
 
-    let userId = id
-
-    // Nếu chưa có ID, tìm theo email
-    if (!userId && email) {
-      const { data: foundUser, error } = await supabaseAdmin
-        .from("auth.users")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle()
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      if (!foundUser?.id)
-        return NextResponse.json({ ok: false, message: "user-not-found-yet" }, { status: 202 })
-      userId = foundUser.id
-    }
-
-    if (!userId)
-      return NextResponse.json({ error: "must provide user id or email" }, { status: 400 })
-
-    // Kiểm tra profile hiện tại
-    const { data: existingProfile, error: profileError } = await supabaseAdmin
+    // 1️⃣ Check profile tồn tại chưa
+    const { data: existingProfile, error: checkError } = await supabaseAdmin
       .from("profiles")
-      .select("*")
-      .eq("id", userId)
+      .select("id")
+      .eq("id", id)
       .maybeSingle()
 
-    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
+    if (checkError) {
+      return NextResponse.json({ ok: false, error: checkError.message }, { status: 500 })
+    }
 
-    if (existingProfile) {
-      // Update profile
-      const updatePayload: any = { updated_at: new Date().toISOString() }
-      if (full_name) updatePayload.full_name = full_name
-      if (role) updatePayload.role = role
-
-      // Chỉ update avatar nếu gửi avatar_url mới hoặc profile chưa có avatar
-      if (avatar_url && (!existingProfile.avatar_url || existingProfile.avatar_url !== avatar_url)) {
-        updatePayload.avatar_url = avatar_url
-      }
-
+    // 2️⃣ INSERT nếu chưa có
+    if (!existingProfile) {
       const { data, error } = await supabaseAdmin
         .from("profiles")
-        .update(updatePayload)
-        .eq("id", userId)
+        .insert({
+          id,
+          email,
+          full_name,
+          role,
+          avatar_url,
+        })
         .select()
         .single()
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      }
+
       return NextResponse.json({ ok: true, profile: data })
     }
 
-    // Nếu profile chưa tồn tại → insert
-    const insertPayload: any = {
-      id: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    if (email) insertPayload.email = email
-    if (full_name) insertPayload.full_name = full_name
-    if (role) insertPayload.role = role
-    if (avatar_url) insertPayload.avatar_url = avatar_url
-
+    // 3️⃣ UPDATE nếu đã có
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .insert(insertPayload)
+      .update({
+        email,
+        full_name,
+        role,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    }
+
     return NextResponse.json({ ok: true, profile: data })
   } catch (err: any) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, error: err.message ?? String(err) },
+      { status: 500 }
+    )
   }
 }
