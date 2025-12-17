@@ -11,19 +11,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 export async function POST(req: Request) {
   try {
     const payload = await req.json()
-    const {
-      id,
-      email,
-      full_name,
-      role,
-      avatar_url,
-    }: {
-      id?: string
-      email?: string
-      full_name?: string
-      role?: string
-      avatar_url?: string
-    } = payload
+    const { id, email, full_name, role, avatar_url } = payload
 
     let userId = id
 
@@ -43,55 +31,50 @@ export async function POST(req: Request) {
     if (!userId)
       return NextResponse.json({ error: "must provide user id or email" }, { status: 400 })
 
-    // Tìm profile hiện tại
+    // Kiểm tra profile hiện tại
     const { data: existingProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("id", userId)
       .maybeSingle()
-
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
 
-    // Nếu profile tồn tại → update (upsert)
-    if (existingProfile) {
-      const updatePayload: any = {
-        updated_at: new Date().toISOString(),
-      }
-      if (full_name) updatePayload.full_name = full_name
-      if (role) updatePayload.role = role
-      if (avatar_url) updatePayload.avatar_url = avatar_url
+    // Chuẩn bị payload
+    const payloadData: any = {
+      updated_at: new Date().toISOString(),
+    }
+    if (full_name) payloadData.full_name = full_name
+    if (role) payloadData.role = role
+    if (typeof avatar_url === "string" && avatar_url.trim() !== "") payloadData.avatar_url = avatar_url
 
+    if (existingProfile) {
+      // Update profile
       const { data, error } = await supabaseAdmin
         .from("profiles")
-        .update(updatePayload)
+        .update(payloadData)
         .eq("id", userId)
         .select()
         .single()
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true, profile: data })
+    } else {
+      // Insert profile mới
+      const insertData: any = {
+        id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...payloadData,
+      }
+      if (email) insertData.email = email
 
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .insert(insertData)
+        .select()
+        .single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true, profile: data })
     }
-
-    // Nếu profile chưa tồn tại → insert
-    const insertPayload: any = {
-      id: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    if (email) insertPayload.email = email
-    if (full_name) insertPayload.full_name = full_name
-    if (role) insertPayload.role = role
-    if (avatar_url) insertPayload.avatar_url = avatar_url
-
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .insert(insertPayload)
-      .select()
-      .single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ ok: true, profile: data })
   } catch (err: any) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
