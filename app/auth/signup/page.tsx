@@ -1,4 +1,3 @@
-đây là backend 
 'use client'
 
 import React, { useState } from 'react'
@@ -231,4 +230,3 @@ export default function SignUpPage() {
     </div>
   )
 }
-còn đây là frontend chỉnh sao để nó hết lỗi khi chọn avt nó k lưu là avt default đi, cần thiết thì cho cả mã SQL đi
