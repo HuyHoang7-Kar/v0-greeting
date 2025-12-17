@@ -56,22 +56,28 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
 
-  // ⭐ Avatar mặc định
-  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
+  // 🔥 KHÔNG set avatar mặc định
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   async function serverUpsertProfile(opts: { id?: string }) {
+    const body: any = {
+      ...opts,
+      full_name: fullName,
+      role,
+    }
+
+    // ✅ CHỈ gửi avatar khi user đã chọn
+    if (avatarUrl) {
+      body.avatar_url = avatarUrl
+    }
+
     await fetch('/api/internal/upsert-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...opts,
-        full_name: fullName,
-        role,
-        avatar_url: avatarUrl,
-      }),
+      body: JSON.stringify(body),
     })
   }
 
@@ -99,7 +105,8 @@ export default function SignUpPage() {
           data: {
             full_name: fullName,
             role,
-            avatar_url: avatarUrl,
+            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
+            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           },
         },
       })
@@ -157,6 +164,13 @@ export default function SignUpPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* hint */}
+                {!avatarUrl && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Nếu không chọn, hệ thống sẽ dùng avatar mặc định
+                  </p>
+                )}
               </div>
 
               <div>
