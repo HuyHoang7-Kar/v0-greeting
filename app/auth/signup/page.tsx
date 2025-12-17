@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,37 +17,70 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/* =======================
-   AVATAR LIST
-======================= */
+/* ================= AVATAR ĐỘNG VẬT (TRẺ EM) ================= */
 const AVATARS = [
-  { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
-  { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
-  { id: 'rabbit', name: 'Thỏ trắng 🐰', url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png' },
-  { id: 'bear', name: 'Gấu nâu 🐻', url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png' },
-  { id: 'lion', name: 'Sư tử 🦁', url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png' },
+  {
+    id: 'dog',
+    name: 'Chó con 🐶',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png',
+  },
+  {
+    id: 'cat',
+    name: 'Mèo nhỏ 🐱',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png',
+  },
+  {
+    id: 'rabbit',
+    name: 'Thỏ trắng 🐰',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png',
+  },
+  {
+    id: 'bear',
+    name: 'Gấu nâu 🐻',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png',
+  },
+  {
+    id: 'lion',
+    name: 'Sư tử 🦁',
+    url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png',
+  },
 ]
 
 export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  /* =======================
-     FORM STATE
-  ======================= */
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
+
+  // 🔥 KHÔNG set avatar mặc định
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
 
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  /* =======================
-     SUBMIT HANDLER
-  ======================= */
+  async function serverUpsertProfile(opts: { id?: string }) {
+    const body: any = {
+      ...opts,
+      full_name: fullName,
+      role,
+    }
+
+    // ✅ CHỈ gửi avatar khi user đã chọn
+    if (avatarUrl) {
+      body.avatar_url = avatarUrl
+    }
+
+    await fetch('/api/internal/upsert-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -65,49 +98,28 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      /* 1️⃣ SIGN UP AUTH */
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role,
+            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
+            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+          },
+        },
       })
 
-      if (signUpError) {
-        setError(signUpError.message)
+      if (error) {
+        setError(error.message)
         return
       }
 
-      const userId = data?.user?.id
-      if (!userId) {
-        setError('Không lấy được user id')
-        return
+      if (data?.user?.id) {
+        await serverUpsertProfile({ id: data.user.id })
       }
 
-      /* 2️⃣ UPSERT PROFILE */
-      const res = await fetch('/api/internal/upsert-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: userId,
-          email,
-          full_name: fullName,
-          role,
-          avatar_url: avatarUrl,
-        }),
-      })
-
-      let result: any = null
-      try {
-        result = await res.json()
-      } catch {
-        throw new Error('Backend không trả JSON')
-      }
-
-      if (!res.ok || !result?.ok) {
-        console.error('Profile error:', result)
-        throw new Error('Lưu thông tin người dùng thất bại')
-      }
-
-      /* 3️⃣ SUCCESS */
       router.push('/auth/signup-success')
     } catch (err: any) {
       setError(err.message ?? 'Có lỗi xảy ra')
@@ -116,9 +128,6 @@ export default function SignUpPage() {
     }
   }
 
-  /* =======================
-     UI
-  ======================= */
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-sky-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -128,50 +137,50 @@ export default function SignUpPage() {
               Học tập cùng Flashcard 🎒
             </CardTitle>
             <CardDescription className="text-gray-600 mt-2">
-              Chọn nhân vật và đăng ký tài khoản
+              Chọn nhân vật và bắt đầu học nhé!
             </CardDescription>
           </CardHeader>
 
           <CardContent>
-            {/* AVATAR SELECT */}
-            <div className="mb-4">
-              <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
-              <Select value={avatarUrl} onValueChange={setAvatarUrl}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVATARS.map((a) => (
-                    <SelectItem key={a.id} value={a.url}>
-                      <div className="flex items-center gap-2">
-                        <img src={a.url} className="w-8 h-8 rounded-full" />
-                        <span>{a.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* FORM */}
             <form onSubmit={handleSignUp} className="space-y-4">
+
+              {/* AVATAR */}
+              <div>
+                <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  {AVATARS.map((a) => (
+                    <div
+                      key={a.id}
+                      onClick={() => setAvatarUrl(a.url)}
+                      className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition
+                        ${
+                          avatarUrl === a.url
+                            ? 'border-yellow-400 bg-yellow-50 scale-105'
+                            : 'border-transparent hover:bg-white'
+                        }`}
+                    >
+                      <img src={a.url} className="w-16 h-16 mx-auto" />
+                      <p className="text-sm mt-1">{a.name}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* hint */}
+                {!avatarUrl && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Nếu không chọn, hệ thống sẽ dùng avatar mặc định
+                  </p>
+                )}
+              </div>
+
               <div>
                 <Label>Họ và tên</Label>
-                <Input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
               </div>
 
               <div>
                 <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
 
               <div>
@@ -190,22 +199,12 @@ export default function SignUpPage() {
 
               <div>
                 <Label>Mật khẩu</Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
 
               <div>
                 <Label>Xác nhận mật khẩu</Label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
