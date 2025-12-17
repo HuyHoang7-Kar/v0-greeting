@@ -4,10 +4,13 @@ import { createClient } from "@supabase/supabase-js"
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+// 🔐 Supabase Admin (Service Role)
 const supabaseAdmin = createClient(
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } }
+  {
+    auth: { persistSession: false },
+  }
 )
 
 export async function POST(req: Request) {
@@ -30,7 +33,9 @@ export async function POST(req: Request) {
 
     let userId = id
 
-    // 🔍 Tìm user theo email nếu chưa có id
+    // ===============================
+    // 🔍 TÌM USER THEO EMAIL (NẾU CHƯA CÓ ID)
+    // ===============================
     if (!userId && email) {
       const { data: foundUser, error } = await supabaseAdmin
         .from("auth.users")
@@ -59,11 +64,13 @@ export async function POST(req: Request) {
       )
     }
 
-    // 🔎 Lấy profile hiện tại
+    // ===============================
+    // 🔎 LẤY PROFILE HIỆN TẠI
+    // ===============================
     const { data: existingProfile, error: profileError } =
       await supabaseAdmin
         .from("profiles")
-        .select("id, avatar_url")
+        .select("id")
         .eq("id", userId)
         .maybeSingle()
 
@@ -84,13 +91,8 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       }
 
-      // 🔥 CHỈ SET AVATAR 1 LẦN DUY NHẤT
-      if (
-        (!existingProfile.avatar_url ||
-          existingProfile.avatar_url.trim() === "") &&
-        typeof avatar_url === "string" &&
-        avatar_url.trim() !== ""
-      ) {
+      // 🔥 LUÔN ƯU TIÊN AVATAR USER CHỌN
+      if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
         updatePayload.avatar_url = avatar_url
       }
 
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
     }
 
     // ===============================
-    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI (HIẾM)
+    // ✅ CASE 2: PROFILE CHƯA TỒN TẠI
     // ===============================
     if (!avatar_url || avatar_url.trim() === "") {
       return NextResponse.json(
