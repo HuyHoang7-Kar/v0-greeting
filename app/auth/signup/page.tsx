@@ -102,14 +102,14 @@ export default function SignUpPage() {
         email,
         password,
         options: {
-          data: {
-            full_name: fullName,
-            role,
-            // ⚠️ KHÔNG gửi avatar mặc định vào user_metadata
-            ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-          },
+        data: {
+          full_name: fullName,
+          role,
+      // ❌ TUYỆT ĐỐI KHÔNG GỬI avatar vào user_metadata
         },
-      })
+      },
+    })
+
 
       if (error) {
         setError(error.message)
