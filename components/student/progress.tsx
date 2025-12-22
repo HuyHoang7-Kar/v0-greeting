@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
 
-// Khởi tạo Supabase client
-const supabaseUrl = "https://byrguxinsefhcrvmkbow.supabase.co"
-const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // Thay bằng anon key của bạn
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface QuizResult {
   id: string
@@ -41,7 +41,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
     async function fetchData() {
       setIsLoading(true)
       try {
-        // 1️⃣ Lấy profile
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, email")
@@ -50,7 +49,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
         if (profileError) throw profileError
         setProfile(profileData)
 
-        // 2️⃣ Lấy kết quả quiz + title
         const { data: resultsData, error: resultsError } = await supabase
           .from("results")
           .select(`
@@ -62,7 +60,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           `)
           .eq("user_id", studentId)
           .order("completed_at", { ascending: false })
-
         if (resultsError) throw resultsError
 
         const mapped: QuizResult[] = (resultsData || []).map((r: any) => ({
@@ -74,8 +71,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
         }))
 
         setResults(mapped)
-
-        // 3️⃣ Tính tổng điểm & điểm trung bình
         const total = mapped.reduce((sum, r) => sum + r.score, 0)
         setTotalPoints(total)
         setAverageScore(mapped.length > 0 ? Math.round(total / mapped.length) : 0)
@@ -90,7 +85,8 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
     fetchData()
   }, [studentId])
 
-  if (isLoading) return <div className="text-center py-12 text-gray-500">⏳ Đang tải dữ liệu...</div>
+  if (isLoading)
+    return <div className="text-center py-12 text-gray-500">⏳ Đang tải dữ liệu...</div>
 
   const totalQuizzes = results.length
   const recentResults = results.slice(0, 5)
