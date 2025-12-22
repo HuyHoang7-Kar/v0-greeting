@@ -1,95 +1,43 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-interface QuizResult {
+interface Quiz {
   id: string
+  title: string
+}
+
+interface Result {
+  id: string
+  quiz_id: string
   score: number
   total_questions: number
   completed_at: string
-  quiz_title: string
-}
-
-interface Profile {
-  full_name: string
-  email: string
 }
 
 interface StudentProgressProps {
-  studentId: string
+  results: Result[]
+  quizzes: Quiz[]
 }
 
-export function StudentProgress({ studentId }: StudentProgressProps) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [results, setResults] = useState<QuizResult[]>([])
-  const [totalPoints, setTotalPoints] = useState<number>(0)
-  const [averageScore, setAverageScore] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    if (!studentId) return
-
-    async function fetchData() {
-      setIsLoading(true)
-      try {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("full_name, email")
-          .eq("id", studentId)
-          .single()
-        if (profileError) throw profileError
-        setProfile(profileData)
-
-        const { data: resultsData, error: resultsError } = await supabase
-          .from("results")
-          .select(`
-            id,
-            score,
-            total_questions,
-            completed_at,
-            quizzes (title)
-          `)
-          .eq("user_id", studentId)
-          .order("completed_at", { ascending: false })
-        if (resultsError) throw resultsError
-
-        const mapped: QuizResult[] = (resultsData || []).map((r: any) => ({
-          id: r.id,
-          score: r.score,
-          total_questions: r.total_questions,
-          completed_at: r.completed_at,
-          quiz_title: r.quizzes?.title || "Chưa có tiêu đề",
-        }))
-
-        setResults(mapped)
-        const total = mapped.reduce((sum, r) => sum + r.score, 0)
-        setTotalPoints(total)
-        setAverageScore(mapped.length > 0 ? Math.round(total / mapped.length) : 0)
-
-      } catch (err) {
-        console.error("Không thể tải dữ liệu:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [studentId])
-
-  if (isLoading)
-    return <div className="text-center py-12 text-gray-500">⏳ Đang tải dữ liệu...</div>
+export function StudentProgress({ results, quizzes }: StudentProgressProps) {
+  // map quiz_id -> title
+  const quizMap = quizzes.reduce<Record<string, string>>((acc, q) => {
+    acc[q.id] = q.title
+    return acc
+  }, {})
 
   const totalQuizzes = results.length
-  const recentResults = results.slice(0, 5)
+  const totalPoints = results.reduce((sum, r) => sum + r.score, 0)
+  const averageScore = totalQuizzes > 0
+    ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / totalQuizzes)
+    : 0
+
+  const recentResults = results
+    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+    .slice(0, 5)
 
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return "text-green-600 bg-green-100"
@@ -99,16 +47,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
 
   return (
     <div className="space-y-6">
-      {/* Hồ sơ học sinh */}
-      <Card className="border-2 border-gray-200">
-        <CardContent>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Hồ sơ học sinh</h2>
-          <p className="text-gray-700">Họ tên: {profile?.full_name}</p>
-          <p className="text-gray-700">Email: {profile?.email}</p>
-        </CardContent>
-      </Card>
-
-      {/* Thống kê */}
+      {/* Thống kê tổng quan */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
           <CardContent className="p-6 flex justify-between items-center">
@@ -150,27 +89,27 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {results.length === 0 ? (
+          {recentResults.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Chưa có kết quả kiểm tra</div>
           ) : (
             <div className="space-y-4">
-              {recentResults.map((result) => {
-                const percentage = Math.round((result.score / result.total_questions) * 100)
+              {recentResults.map((r) => {
+                const percentage = Math.round((r.score / r.total_questions) * 100)
                 return (
                   <div
-                    key={result.id}
+                    key={r.id}
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                   >
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{result.quiz_title}</h4>
+                      <h4 className="font-medium text-gray-900">{quizMap[r.quiz_id] || "Quiz"}</h4>
                       <p className="text-sm text-gray-500">
-                        Hoàn thành: {new Date(result.completed_at).toLocaleDateString()}
+                        Hoàn thành: {new Date(r.completed_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
-                          {result.score}/{result.total_questions}
+                          {r.score}/{r.total_questions}
                         </p>
                       </div>
                       <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
