@@ -34,41 +34,6 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // ================= serverUpsertProfile =================
-  async function serverUpsertProfile(userId: string) {
-    console.log("[v0] Calling upsert with:", { userId, fullName, role, avatarUrl })
-
-    const body = {
-      id: userId,
-      full_name: fullName.trim(),
-      role: role,
-      avatar_url: avatarUrl,
-    }
-
-    const res = await fetch("/api/internal/upsert-profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-
-    const text = await res.text()
-    console.log("[v0] API response text:", text)
-
-    let data
-    try {
-      data = JSON.parse(text)
-    } catch (err) {
-      console.error("[v0] Failed to parse JSON:", text)
-      throw new Error("Server trả về không đúng định dạng JSON")
-    }
-
-    if (!res.ok) {
-      throw new Error(data.error || "Không thể tạo profile")
-    }
-
-    return data
-  }
-
   // ================= handleSignUp =================
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,6 +59,7 @@ export default function SignUpPage() {
     try {
       console.log("[v0] Starting signup with:", { email, fullName, role, avatarUrl })
 
+      // Bước 1: Tạo user trong auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -120,7 +86,21 @@ export default function SignUpPage() {
 
       console.log("[v0] User created:", data.user.id)
 
-      await serverUpsertProfile(data.user.id)
+      // Bước 2: Insert profile trực tiếp vào database
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: data.user.id,
+        email: email,
+        full_name: fullName.trim(),
+        role: role,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (profileError) {
+        console.error("[v0] Profile error:", profileError)
+        setError("Tạo tài khoản thành công nhưng không thể lưu thông tin: " + profileError.message)
+        return
+      }
 
       console.log("[v0] Profile created successfully")
       router.push("/auth/signup-success")
