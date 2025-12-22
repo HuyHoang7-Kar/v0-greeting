@@ -1,10 +1,12 @@
-"use client"
+'use client'
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,6 +22,7 @@ const AVATARS = [
 export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -38,34 +41,42 @@ export default function SignUpPage() {
     if (password.length < 6) return setError("Mật khẩu phải có ít nhất 6 ký tự")
 
     setIsLoading(true)
+
     try {
       // 1️⃣ Tạo user
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
+          data: { full_name: fullName.trim(), role, avatar_url: avatarUrl },
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
         },
       })
-      if (signUpError) return setError(signUpError.message)
-      if (!data?.user?.id) return setError("Không thể tạo tài khoản")
 
-      // 2️⃣ Upsert profile qua API server-side (bypass RLS)
-      const res = await fetch("/app/api/internal/upsert-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: data.user.id,
+      if (signUpError) throw new Error(signUpError.message)
+      if (!authData?.user?.id) throw new Error("Không thể tạo tài khoản")
+
+      const userId = authData.user.id
+
+      // 2️⃣ Upsert profile trực tiếp (dùng RLS)
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: userId,
+          email,
           full_name: fullName.trim(),
           role,
           avatar_url: avatarUrl,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) return setError(json?.error || "Không thể lưu profile")
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (profileError) throw new Error(profileError.message)
 
       router.push("/auth/signup-success")
     } catch (err: any) {
+      console.error("SignUp error:", err)
       setError(err.message || "Có lỗi xảy ra")
     } finally {
       setIsLoading(false)
@@ -82,11 +93,11 @@ export default function SignUpPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
-              {/* AVATAR */}
+              {/* Avatar */}
               <div>
                 <Label className="text-base font-semibold">Nhân vật của bé 🐾</Label>
                 <div className="grid grid-cols-3 gap-3 mt-3">
-                  {AVATARS.map((a) => (
+                  {AVATARS.map(a => (
                     <div
                       key={a.id}
                       onClick={() => setAvatarUrl(a.url)}
@@ -103,18 +114,18 @@ export default function SignUpPage() {
 
               <div>
                 <Label>Họ và tên</Label>
-                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                <Input value={fullName} onChange={e => setFullName(e.target.value)} required />
               </div>
+
               <div>
                 <Label>Email</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
+
               <div>
                 <Label>Vai trò</Label>
-                <Select value={role} onValueChange={(v: any) => setRole(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={role} onValueChange={v => setRole(v as "student" | "teacher" | "admin")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học sinh</SelectItem>
                     <SelectItem value="teacher">Giáo viên</SelectItem>
@@ -122,13 +133,15 @@ export default function SignUpPage() {
                   </SelectContent>
                 </Select>
               </div>
+
               <div>
                 <Label>Mật khẩu</Label>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
+
               <div>
                 <Label>Xác nhận mật khẩu</Label>
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
