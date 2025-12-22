@@ -1,50 +1,45 @@
-'use client'
+"use client"
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import type React from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 /* ================= AVATAR ĐỘNG VẬT (TRẺ EM) ================= */
 const AVATARS = [
-  { id: 'dog', name: 'Chó con 🐶', url: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },
-  { id: 'cat', name: 'Mèo nhỏ 🐱', url: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },
-  { id: 'rabbit', name: 'Thỏ trắng 🐰', url: 'https://cdn-icons-png.flaticon.com/512/616/616494.png' },
-  { id: 'bear', name: 'Gấu nâu 🐻', url: 'https://cdn-icons-png.flaticon.com/512/616/616438.png' },
-  { id: 'lion', name: 'Sư tử 🦁', url: 'https://cdn-icons-png.flaticon.com/512/616/616554.png' },
+  { id: "dog", name: "Chó con 🐶", url: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { id: "cat", name: "Mèo nhỏ 🐱", url: "https://cdn-icons-png.flaticon.com/512/616/616430.png" },
+  { id: "rabbit", name: "Thỏ trắng 🐰", url: "https://cdn-icons-png.flaticon.com/512/616/616494.png" },
+  { id: "bear", name: "Gấu nâu 🐻", url: "https://cdn-icons-png.flaticon.com/512/616/616438.png" },
+  { id: "lion", name: "Sư tử 🦁", url: "https://cdn-icons-png.flaticon.com/512/616/616554.png" },
 ]
 
 export default function SignUpPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student')
-  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [fullName, setFullName] = useState("")
+  const [role, setRole] = useState<"student" | "teacher" | "admin">("student")
+  const [avatarUrl, setAvatarUrl] = useState<string>(AVATARS[0].url)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // ================= serverUpsertProfile =================
   async function serverUpsertProfile(id: string) {
     const body = { id, full_name: fullName, role, avatar_url: avatarUrl }
-    const res = await fetch('/app/api/internal/upsert-profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/internal/upsert-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
 
@@ -52,10 +47,10 @@ export default function SignUpPage() {
     try {
       data = await res.json()
     } catch (err) {
-      throw new Error('Upsert profile failed: Response is not valid JSON')
+      throw new Error("Upsert profile failed: Response is not valid JSON")
     }
 
-    if (!res.ok) throw new Error(data.error || 'Upsert profile failed')
+    if (!res.ok) throw new Error(data.error || "Upsert profile failed")
     return data
   }
 
@@ -65,17 +60,17 @@ export default function SignUpPage() {
     setError(null)
 
     if (!fullName.trim()) {
-      setError('Họ và tên không được để trống')
+      setError("Họ và tên không được để trống")
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Mật khẩu không khớp')
+      setError("Mật khẩu không khớp")
       return
     }
 
     if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
+      setError("Mật khẩu phải có ít nhất 6 ký tự")
       return
     }
 
@@ -85,7 +80,14 @@ export default function SignUpPage() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName, role } },
+        options: {
+          data: {
+            full_name: fullName,
+            role,
+            avatar_url: avatarUrl,
+          },
+          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+        },
       })
 
       if (error) {
@@ -97,9 +99,9 @@ export default function SignUpPage() {
         await serverUpsertProfile(data.user.id)
       }
 
-      router.push('/auth/signup-success')
+      router.push("/auth/signup-success")
     } catch (err: any) {
-      setError(err.message ?? 'Có lỗi xảy ra')
+      setError(err.message ?? "Có lỗi xảy ra")
     } finally {
       setIsLoading(false)
     }
@@ -126,15 +128,16 @@ export default function SignUpPage() {
                       key={a.id}
                       onClick={() => setAvatarUrl(a.url)}
                       className={`cursor-pointer rounded-2xl p-3 text-center border-2 transition ${
-                        avatarUrl === a.url ? 'border-yellow-400 bg-yellow-50 scale-105' : 'border-transparent hover:bg-white'
+                        avatarUrl === a.url
+                          ? "border-yellow-400 bg-yellow-50 scale-105"
+                          : "border-transparent hover:bg-white"
                       }`}
                     >
-                      <img src={a.url} className="w-16 h-16 mx-auto" />
+                      <img src={a.url || "/placeholder.svg"} alt={a.name} className="w-16 h-16 mx-auto" />
                       <p className="text-sm mt-1">{a.name}</p>
                     </div>
                   ))}
                 </div>
-                {!avatarUrl && <p className="text-xs text-gray-500 mt-2">Nếu không chọn, hệ thống sẽ dùng avatar mặc định</p>}
               </div>
 
               <div>
@@ -168,18 +171,27 @@ export default function SignUpPage() {
 
               <div>
                 <Label>Xác nhận mật khẩu</Label>
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
 
-              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-white text-lg rounded-xl" disabled={isLoading}>
-                {isLoading ? 'Đang tạo...' : 'Bắt đầu học 🚀'}
+              <Button
+                type="submit"
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white text-lg rounded-xl"
+                disabled={isLoading}
+              >
+                {isLoading ? "Đang tạo..." : "Bắt đầu học 🚀"}
               </Button>
             </form>
 
             <p className="text-center text-sm mt-4">
-              Đã có tài khoản?{' '}
+              Đã có tài khoản?{" "}
               <Link href="/auth/login" className="text-pink-500 font-semibold">
                 Đăng nhập
               </Link>
