@@ -35,22 +35,37 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   // ================= serverUpsertProfile =================
-  async function serverUpsertProfile(id: string) {
-    const body = { id, full_name: fullName, role, avatar_url: avatarUrl }
+  async function serverUpsertProfile(userId: string) {
+    console.log("[v0] Calling upsert with:", { userId, fullName, role, avatarUrl })
+
+    const body = {
+      id: userId,
+      full_name: fullName.trim(),
+      role: role,
+      avatar_url: avatarUrl,
+    }
+
     const res = await fetch("/api/internal/upsert-profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
 
+    const text = await res.text()
+    console.log("[v0] API response text:", text)
+
     let data
     try {
-      data = await res.json()
+      data = JSON.parse(text)
     } catch (err) {
-      throw new Error("Upsert profile failed: Response is not valid JSON")
+      console.error("[v0] Failed to parse JSON:", text)
+      throw new Error("Server trả về không đúng định dạng JSON")
     }
 
-    if (!res.ok) throw new Error(data.error || "Upsert profile failed")
+    if (!res.ok) {
+      throw new Error(data.error || "Không thể tạo profile")
+    }
+
     return data
   }
 
@@ -77,31 +92,41 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      console.log("[v0] Starting signup with:", { email, fullName, role, avatarUrl })
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName,
-            role,
+            full_name: fullName.trim(),
+            role: role,
             avatar_url: avatarUrl,
           },
           emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
         },
       })
 
-      if (error) {
-        setError(error.message)
+      if (signUpError) {
+        console.error("[v0] SignUp error:", signUpError)
+        setError(signUpError.message)
         return
       }
 
-      if (data?.user?.id) {
-        await serverUpsertProfile(data.user.id)
+      if (!data?.user?.id) {
+        setError("Không thể tạo tài khoản")
+        return
       }
 
+      console.log("[v0] User created:", data.user.id)
+
+      await serverUpsertProfile(data.user.id)
+
+      console.log("[v0] Profile created successfully")
       router.push("/auth/signup-success")
     } catch (err: any) {
-      setError(err.message ?? "Có lỗi xảy ra")
+      console.error("[v0] Signup error:", err)
+      setError(err.message || "Có lỗi xảy ra")
     } finally {
       setIsLoading(false)
     }
