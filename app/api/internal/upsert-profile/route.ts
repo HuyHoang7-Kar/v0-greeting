@@ -23,23 +23,31 @@ export async function POST(req: Request) {
       avatar_url?: string
     } = await req.json()
 
+    // 1️⃣ Kiểm tra bắt buộc user id
     if (!id) {
       return NextResponse.json({ error: "missing user id" }, { status: 400 })
     }
 
-    // ✅ đảm bảo role hợp lệ
-    const validRoles = ["student", "teacher", "admin"]
-    const safeRole = validRoles.includes(role ?? "") ? role : "student"
+    // 2️⃣ Kiểm tra full_name
+    if (!full_name?.trim()) {
+      return NextResponse.json({ error: "full_name không được để trống" }, { status: 400 })
+    }
 
-    // ✅ chỉ gửi avatar nếu có
+    // 3️⃣ Xử lý role
+    const validRoles = ["student", "teacher", "admin"]
+    const safeRole = typeof role === "string" && validRoles.includes(role) ? role : "student"
+
+    // 4️⃣ Xử lý avatar mặc định nếu không có
+    const defaultAvatar = "https://cdn-icons-png.flaticon.com/512/616/616408.png"
+    const finalAvatar = avatar_url?.trim() || defaultAvatar
+
+    // 5️⃣ Payload upsert
     const payload: any = {
       id,
-      full_name,
+      full_name: full_name.trim(),
       role: safeRole,
+      avatar_url: finalAvatar,
       updated_at: new Date().toISOString(),
-    }
-    if (avatar_url?.trim()) {
-      payload.avatar_url = avatar_url
     }
 
     const { data, error } = await supabaseAdmin
