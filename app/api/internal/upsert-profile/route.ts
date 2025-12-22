@@ -13,41 +13,32 @@ export async function POST(req: Request) {
   try {
     const {
       id,
-      email,
       full_name,
       role,
       avatar_url,
     }: {
       id?: string
-      email?: string
       full_name?: string
       role?: string
       avatar_url?: string
     } = await req.json()
 
-    // ===============================
-    // 1️⃣ VALIDATION – BẮT BUỘC CÓ USER ID
-    // ===============================
     if (!id) {
-      return NextResponse.json(
-        { error: "missing user id" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "missing user id" }, { status: 400 })
     }
 
-    // ===============================
-    // 2️⃣ UPSERT PROFILE (1 LỆNH DUY NHẤT)
-    // ===============================
+    // ✅ đảm bảo role hợp lệ
+    const validRoles = ["student", "teacher", "admin"]
+    const safeRole = validRoles.includes(role ?? "") ? role : "student"
+
+    // ✅ chỉ gửi avatar nếu có
     const payload: any = {
       id,
-      email,
       full_name,
-      role,
+      role: safeRole,
       updated_at: new Date().toISOString(),
     }
-
-    // 👉 CHỈ GHI avatar KHI FRONTEND GỬI
-    if (typeof avatar_url === "string" && avatar_url.trim() !== "") {
+    if (avatar_url?.trim()) {
       payload.avatar_url = avatar_url
     }
 
@@ -59,19 +50,13 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("Upsert profile error:", error)
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true, profile: data })
 
   } catch (err: any) {
     console.error("upsert-profile fatal error:", err)
-    return NextResponse.json(
-      { error: String(err) },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
