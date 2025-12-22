@@ -1,42 +1,74 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+// app/api/internal/upsert-profile/route.ts
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Service Role Key để bypass RLS
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars for /api/internal/upsert-profile');
+}
+
+const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { persistSession: false },
+});
 
 export async function POST(req: Request) {
   try {
-    const { id, full_name, role, avatar_url } = await req.json()
+    const payload = await req.json();
+    // Accept either { id, full_name, role } OR { email, full_name, role }
+    const { id, email, full_name, role } = payload as {
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    };
 
-    if (!id) return NextResponse.json({ error: "missing user id" }, { status: 400 })
-    if (!full_name?.trim()) return NextResponse.json({ error: "full_name cannot be empty" }, { status: 400 })
+    let userId = id;
 
-    // Kiểm tra role hợp lệ
-    const validRoles = ["student", "teacher", "admin"]
-    const safeRole = validRoles.includes(role ?? "") ? role : "student"
+    // If no id but email provided, try find auth.users by email (service role can read auth.users)
+    if (!userId && email) {
+      const { data: found, error: findErr } = await supabaseAdmin
+        .from('auth.users')
+        .select('id')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle();
 
-    const payload = {
-      id,
-      full_name: full_name.trim(),
-      role: safeRole,
-      avatar_url: avatar_url?.trim() || "https://cdn-icons-png.flaticon.com/512/616/616408.png",
-      updated_at: new Date().toISOString(),
+      if (findErr) {
+        console.error('Error finding user by email', findErr);
+        return NextResponse.json({ error: findErr.message }, { status: 500 });
+      }
+
+      if (!found || !(found as any).id) {
+        // user not present yet (e.g. confirmation pending). Return 202 to indicate "not ready"
+        return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 });
+      }
+
+      userId = (found as any).id;
     }
 
+    if (!userId) {
+      return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 });
+    }
+
+    // Build upsert payload for profiles
+    const upsertPayload: any = { id: userId };
+    if (typeof full_name !== 'undefined') upsertPayload.full_name = full_name;
+    if (typeof role !== 'undefined') upsertPayload.role = role;
+
     const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .single()
+      .from('public.profiles')
+      .upsert(upsertPayload, { returning: 'representation' });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Error upserting profile', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true, profile: data })
+    return NextResponse.json({ ok: true, profile: data?.[0] ?? null });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || String(err) }, { status: 500 })
+    console.error('Internal upsert-profile error', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
