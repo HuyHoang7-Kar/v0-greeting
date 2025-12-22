@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
 
+// Khởi tạo Supabase client
 const supabaseUrl = "https://byrguxinsefhcrvmkbow.supabase.co"
 const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // Thay bằng anon key của bạn
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
@@ -46,11 +47,10 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           .select("full_name, email")
           .eq("id", studentId)
           .single()
-
         if (profileError) throw profileError
         setProfile(profileData)
 
-        // 2️⃣ Lấy kết quả bài kiểm tra + join quiz title
+        // 2️⃣ Lấy kết quả quiz + title
         const { data: resultsData, error: resultsError } = await supabase
           .from("results")
           .select(`
@@ -75,7 +75,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
 
         setResults(mapped)
 
-        // 3️⃣ Tính totalPoints & averageScore
+        // 3️⃣ Tính tổng điểm & điểm trung bình
         const total = mapped.reduce((sum, r) => sum + r.score, 0)
         setTotalPoints(total)
         setAverageScore(mapped.length > 0 ? Math.round(total / mapped.length) : 0)
@@ -90,9 +90,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
     fetchData()
   }, [studentId])
 
-  if (isLoading) {
-    return <div className="text-center py-12 text-gray-500">Đang tải dữ liệu...</div>
-  }
+  if (isLoading) return <div className="text-center py-12 text-gray-500">⏳ Đang tải dữ liệu...</div>
 
   const totalQuizzes = results.length
   const recentResults = results.slice(0, 5)
@@ -105,7 +103,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
 
   return (
     <div className="space-y-6">
-
       {/* Hồ sơ học sinh */}
       <Card className="border-2 border-gray-200">
         <CardContent>
@@ -117,8 +114,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
 
       {/* Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        {/* Bài kiểm tra hoàn thành */}
         <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
           <CardContent className="p-6 flex justify-between items-center">
             <div>
@@ -129,7 +124,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           </CardContent>
         </Card>
 
-        {/* Điểm trung bình */}
         <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
           <CardContent className="p-6 flex justify-between items-center">
             <div>
@@ -140,7 +134,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           </CardContent>
         </Card>
 
-        {/* Tổng điểm */}
         <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
           <CardContent className="p-6 flex justify-between items-center">
             <div>

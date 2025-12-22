@@ -1,191 +1,246 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trophy, Target, Calendar } from "lucide-react"
+import { useRouter } from "next/navigation"
+import confetti from "canvas-confetti"
+import { LogOut } from "lucide-react"
 
-// Khởi tạo Supabase client
-const supabaseUrl = "https://byrguxinsefhcrvmkbow.supabase.co"
-const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // Thay bằng anon key của bạn
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+import StudentFlashcards from "@/components/student/flashcard-grid"
+import { StudentNotes } from "@/components/student/notes"
+import { StudentQuizzes } from "@/components/student/quizzes"
+import { StudentProgress } from "@/components/student/progress"
+import { GameHub } from "@/components/games/game-hub"
 
-interface QuizResult {
-  id: string
-  score: number
-  total_questions: number
-  completed_at: string
-  quiz_title: string
+/* ===================== IMAGES (UPDATED) ===================== */
+const images = {
+  // 📚 FLASHCARD – thẻ học hoạt hình (MỚI)
+  flashcards: "https://cdn-icons-png.flaticon.com/512/2436/2436874.png",
+
+  // 📝 NOTES – dùng ảnh flashcard cũ (CHUYỂN SANG)
+  notes: "https://cdn-icons-png.flaticon.com/512/4696/4696755.png",
+
+  // ❓ QUIZ – bài kiểm tra hoạt hình (MỚI)
+  quizzes: "https://cdn-icons-png.flaticon.com/512/2010/2010990.png",
+
+  // 📈 PROGRESS – huy hiệu, sao
+  progress: "https://cdn-icons-png.flaticon.com/512/3159/3159310.png",
+
+  // 🎮 GAME
+  games: "https://cdn-icons-png.flaticon.com/512/686/686589.png",
+
+  // 🏫 CLASS – lớp học hoạt hình (MỚI)
+  classes: "https://cdn-icons-png.flaticon.com/512/8074/8074808.png",
+
+  // 👧👦 AVATAR mặc định (ĐỘNG VẬT – TRẺ EM)
+  avatarDefault: "https://cdn-icons-png.flaticon.com/512/616/616408.png", // gấu hoạt hình
 }
 
-interface Profile {
-  full_name: string
-  email: string
-}
+/* ===================== SOUND ===================== */
+const clickSound = () =>
+  new Audio("https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3").play()
 
-interface StudentProgressProps {
-  studentId: string
-}
+const winSound = () =>
+  new Audio("https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3").play()
 
-export function StudentProgress({ studentId }: StudentProgressProps) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [results, setResults] = useState<QuizResult[]>([])
-  const [totalPoints, setTotalPoints] = useState<number>(0)
-  const [averageScore, setAverageScore] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
+/* ===================== TYPES ===================== */
+type View = "flashcards" | "quizzes" | "notes" | "progress" | "games" | "classes"
+
+/* ===================== JOIN CLASS ===================== */
+function JoinClass({ supabase, userId }: any) {
+  const [classes, setClasses] = useState<any[]>([])
+  const [joined, setJoined] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [joiningId, setJoiningId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!studentId) return
+    load()
+  }, [])
 
-    async function fetchData() {
-      setIsLoading(true)
-      try {
-        // 1️⃣ Lấy profile
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("full_name, email")
-          .eq("id", studentId)
-          .single()
-        if (profileError) throw profileError
-        setProfile(profileData)
+  const load = async () => {
+    const { data: cls } = await supabase.from("classes").select("*")
+    const { data: mem } = await supabase
+      .from("class_members")
+      .select("class_id")
+      .eq("user_id", userId)
 
-        // 2️⃣ Lấy kết quả quiz + title
-        const { data: resultsData, error: resultsError } = await supabase
-          .from("results")
-          .select(`
-            id,
-            score,
-            total_questions,
-            completed_at,
-            quizzes (title)
-          `)
-          .eq("user_id", studentId)
-          .order("completed_at", { ascending: false })
-
-        if (resultsError) throw resultsError
-
-        const mapped: QuizResult[] = (resultsData || []).map((r: any) => ({
-          id: r.id,
-          score: r.score,
-          total_questions: r.total_questions,
-          completed_at: r.completed_at,
-          quiz_title: r.quizzes?.title || "Chưa có tiêu đề",
-        }))
-
-        setResults(mapped)
-
-        // 3️⃣ Tính tổng điểm & điểm trung bình
-        const total = mapped.reduce((sum, r) => sum + r.score, 0)
-        setTotalPoints(total)
-        setAverageScore(mapped.length > 0 ? Math.round(total / mapped.length) : 0)
-
-      } catch (err) {
-        console.error("Không thể tải dữ liệu:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [studentId])
-
-  if (isLoading) return <div className="text-center py-12 text-gray-500">⏳ Đang tải dữ liệu...</div>
-
-  const totalQuizzes = results.length
-  const recentResults = results.slice(0, 5)
-
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-green-600 bg-green-100"
-    if (percentage >= 60) return "text-yellow-600 bg-yellow-100"
-    return "text-red-600 bg-red-100"
+    setClasses(cls || [])
+    setJoined(mem?.map((m) => m.class_id) || [])
+    setLoading(false)
   }
 
+  const joinClass = async (classId: string) => {
+    setJoiningId(classId)
+
+    const { error } = await supabase.from("class_members").insert({
+      user_id: userId,
+      class_id: classId,
+    })
+
+    if (!error) {
+      clickSound()
+      await load() // reload danh sách
+    }
+
+    setJoiningId(null)
+  }
+
+  if (loading) return <p className="text-xl">⏳ Đang tải lớp học...</p>
+  if (classes.length === 0) return <p className="text-xl">📭 Chưa có lớp học nào</p>
+
   return (
-    <div className="space-y-6">
-      {/* Hồ sơ học sinh */}
-      <Card className="border-2 border-gray-200">
-        <CardContent>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Hồ sơ học sinh</h2>
-          <p className="text-gray-700">Họ tên: {profile?.full_name}</p>
-          <p className="text-gray-700">Email: {profile?.email}</p>
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {classes.map((c) => {
+        const isJoined = joined.includes(c.id)
 
-      {/* Thống kê */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-6 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Bài Kiểm Tra Hoàn Thành</p>
-              <p className="text-3xl font-bold text-gray-900">{totalQuizzes}</p>
-            </div>
-            <Trophy className="w-8 h-8 text-purple-600" />
-          </CardContent>
-        </Card>
+        return (
+          <Card
+            key={c.id}
+            className="rounded-3xl bg-gradient-to-br from-sky-100 to-pink-100 hover:scale-105 transition"
+          >
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <img src={images.classes} className="w-10 h-10" />
+                <CardTitle>{c.name}</CardTitle>
+              </div>
+              <CardDescription>{c.description}</CardDescription>
+            </CardHeader>
 
-        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-6 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Điểm Trung Bình</p>
-              <p className="text-3xl font-bold text-gray-900">{averageScore}</p>
-            </div>
-            <Target className="w-8 h-8 text-green-600" />
-          </CardContent>
-        </Card>
+            <CardContent className="flex justify-between items-center">
+              {isJoined ? (
+                <Badge className="bg-green-200 text-green-800">
+                  ✅ Đã tham gia
+                </Badge>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={joiningId === c.id}
+                  onClick={() => joinClass(c.id)}
+                >
+                  {joiningId === c.id ? "⏳ Đang vào..." : "➕ Tham gia"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
 
-        <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
-          <CardContent className="p-6 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Tổng Điểm</p>
-              <p className="text-3xl font-bold text-gray-900">{totalPoints}</p>
-            </div>
-            <Trophy className="w-8 h-8 text-yellow-600" />
-          </CardContent>
-        </Card>
+
+/* ===================== DASHBOARD ===================== */
+export function StudentDashboard({ user, profile }: any) {
+  const supabase = createClient()
+  const router = useRouter()
+
+  const [view, setView] = useState<View>("flashcards")
+  const [quizzes, setQuizzes] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>([])
+  const [results, setResults] = useState<any[]>([])
+  const [points, setPoints] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const load = async () => {
+    setQuizzes((await supabase.from("quizzes").select("*")).data || [])
+    setNotes(
+      (await supabase.from("notes").select("*").eq("user_id", user.id)).data || []
+    )
+    setResults(
+      (await supabase.from("results").select("*").eq("user_id", user.id)).data || []
+    )
+    setPoints(
+      (await supabase.from("user_totals").select("*").eq("user_id", user.id).single())
+        .data
+    )
+    setLoading(false)
+  }
+
+  const onQuizDone = () => {
+    winSound()
+    confetti({ particleCount: 200, spread: 160 })
+    load()
+  }
+
+  if (loading) return <p className="p-10">⏳ Đang tải...</p>
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-sky-50">
+      {/* HEADER */}
+      <header className="bg-white shadow sticky top-0 z-10">
+        <div className="flex justify-between items-center px-6 py-4">
+          <div className="flex items-center gap-3">
+            <img
+              src={profile?.avatar_url || images.avatarDefault}
+              className="w-12 h-12 rounded-full border-2 border-pink-400"
+            />
+            <h1 className="text-3xl font-extrabold text-pink-500">
+              Học tập cùng Flashcard 🎒
+            </h1>
+          </div>
+
+          <div className="flex gap-4 items-center">
+            <Badge className="bg-yellow-200 text-yellow-800 px-4 py-1 text-lg">
+              🏆 {points?.total_score || 0}
+            </Badge>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await supabase.auth.signOut()
+                router.push("/")
+              }}
+            >
+              <LogOut className="w-4 h-4 mr-1" /> Đăng xuất
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* MENU */}
+      <div className="px-8 py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+        <Tile title="Flashcards" img={images.flashcards} onClick={() => setView("flashcards")} />
+        <Tile title="Quiz" img={images.quizzes} onClick={() => setView("quizzes")} />
+        <Tile title="Notes" img={images.notes} onClick={() => setView("notes")} />
+        <Tile title="Progress" img={images.progress} onClick={() => setView("progress")} />
+        <Tile title="Games" img={images.games} onClick={() => setView("games")} />
+        <Tile title="Classes" img={images.classes} onClick={() => setView("classes")} />
       </div>
 
-      {/* Kết quả gần đây */}
-      <Card className="border-2 border-gray-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Kết Quả Gần Đây
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {results.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">Chưa có kết quả kiểm tra</div>
-          ) : (
-            <div className="space-y-4">
-              {recentResults.map((result) => {
-                const percentage = Math.round((result.score / result.total_questions) * 100)
-                return (
-                  <div
-                    key={result.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{result.quiz_title}</h4>
-                      <p className="text-sm text-gray-500">
-                        Hoàn thành: {new Date(result.completed_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">
-                          {result.score}/{result.total_questions}
-                        </p>
-                      </div>
-                      <Badge className={getScoreColor(percentage)}>{percentage}%</Badge>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* CONTENT */}
+      <div className="px-8 pb-20">
+        {view === "flashcards" && <StudentFlashcards userId={user.id} />}
+        {view === "quizzes" && (
+          <StudentQuizzes quizzes={quizzes} onQuizComplete={onQuizDone} />
+        )}
+        {view === "notes" && <StudentNotes notes={notes} onNotesChange={load} />}
+        {view === "progress" && <StudentProgress results={results} quizzes={quizzes} />}
+        {view === "games" && <GameHub />}
+        {view === "classes" && <JoinClass supabase={supabase} userId={user.id} />}
+      </div>
+    </div>
+  )
+}
+
+/* ===================== TILE ===================== */
+function Tile({ title, img, onClick }: any) {
+  return (
+    <div
+      onClick={() => {
+        clickSound()
+        onClick()
+      }}
+      className="cursor-pointer rounded-3xl bg-white p-6 flex flex-col items-center gap-3
+      shadow-xl hover:scale-110 transition"
+    >
+      <img src={img} className="w-16 h-16 animate-bounce" />
+      <p className="font-bold text-lg text-pink-600">{title}</p>
     </div>
   )
 }
