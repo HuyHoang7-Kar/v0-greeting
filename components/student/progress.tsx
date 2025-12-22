@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy, Target, Calendar } from "lucide-react"
 
-// Supabase client trực tiếp
 const supabaseUrl = "https://byrguxinsefhcrvmkbow.supabase.co"
-const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // thay bằng anon key của bạn
+const supabaseAnonKey = "YOUR_ANON_KEY_HERE" // Thay bằng anon key của bạn
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface QuizResult {
@@ -32,6 +31,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [results, setResults] = useState<QuizResult[]>([])
   const [totalPoints, setTotalPoints] = useState<number>(0)
+  const [averageScore, setAverageScore] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -58,26 +58,27 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
             score,
             total_questions,
             completed_at,
-            quizzes!inner(title)
+            quizzes (title)
           `)
           .eq("user_id", studentId)
           .order("completed_at", { ascending: false })
 
         if (resultsError) throw resultsError
 
-        const mapped = (resultsData || []).map((r: any) => ({
+        const mapped: QuizResult[] = (resultsData || []).map((r: any) => ({
           id: r.id,
           score: r.score,
           total_questions: r.total_questions,
           completed_at: r.completed_at,
-          quiz_title: r.quizzes.title,
+          quiz_title: r.quizzes?.title || "Chưa có tiêu đề",
         }))
 
         setResults(mapped)
 
-        // 3️⃣ Tính totalPoints từ SUM(score)
-        const total = mapped.reduce((sum: number, r: any) => sum + r.score, 0)
+        // 3️⃣ Tính totalPoints & averageScore
+        const total = mapped.reduce((sum, r) => sum + r.score, 0)
         setTotalPoints(total)
+        setAverageScore(mapped.length > 0 ? Math.round(total / mapped.length) : 0)
 
       } catch (err) {
         console.error("Không thể tải dữ liệu:", err)
@@ -94,11 +95,6 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
   }
 
   const totalQuizzes = results.length
-  const averageScore =
-    totalQuizzes > 0
-      ? Math.round(results.reduce((s, r) => s + r.score, 0) / totalQuizzes)
-      : 0
-
   const recentResults = results.slice(0, 5)
 
   const getScoreColor = (percentage: number) => {
@@ -109,6 +105,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
 
   return (
     <div className="space-y-6">
+
       {/* Hồ sơ học sinh */}
       <Card className="border-2 border-gray-200">
         <CardContent>
@@ -121,7 +118,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
       {/* Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-        {/* Số bài kiểm tra đã làm */}
+        {/* Bài kiểm tra hoàn thành */}
         <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
           <CardContent className="p-6 flex justify-between items-center">
             <div>
@@ -143,7 +140,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
           </CardContent>
         </Card>
 
-        {/* Tổng điểm (không cần bảng user_totals nữa) */}
+        {/* Tổng điểm */}
         <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-yellow-100">
           <CardContent className="p-6 flex justify-between items-center">
             <div>
@@ -165,9 +162,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
         </CardHeader>
         <CardContent>
           {results.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              Chưa có kết quả kiểm tra
-            </div>
+            <div className="text-center py-8 text-gray-500">Chưa có kết quả kiểm tra</div>
           ) : (
             <div className="space-y-4">
               {recentResults.map((result) => {
@@ -180,8 +175,7 @@ export function StudentProgress({ studentId }: StudentProgressProps) {
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{result.quiz_title}</h4>
                       <p className="text-sm text-gray-500">
-                        Hoàn thành:{" "}
-                        {new Date(result.completed_at).toLocaleDateString()}
+                        Hoàn thành: {new Date(result.completed_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
