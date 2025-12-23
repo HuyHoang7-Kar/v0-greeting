@@ -38,6 +38,7 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
+      // Gọi backend signup-user (hoặc upsert-profile) để tạo user + profile
       const res = await fetch('/api/internal/signup-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,6 +50,7 @@ export default function SignUpPage() {
         }),
       })
 
+      // Lấy dữ liệu JSON trả về
       const result = await res.json()
 
       if (!result.ok) {
@@ -57,6 +59,7 @@ export default function SignUpPage() {
         return
       }
 
+      // Thông báo đăng ký thành công
       setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
       router.push('/auth/signup-success')
     } catch (err: unknown) {
