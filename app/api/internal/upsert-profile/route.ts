@@ -1,13 +1,9 @@
-// app/api/internal/signup-user/route.ts
+// app/api/internal/upsert-profile/route.ts
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Missing Supabase env vars for /api/internal/signup-user')
-}
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -18,61 +14,60 @@ const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/616/616408.png'
 
 export async function POST(req: Request) {
   try {
-    const { email, password, full_name, role } = await req.json()
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email và password bắt buộc' }, { status: 400 })
+    const payload = await req.json()
+    const { id, email, full_name, role } = payload as {
+      id?: string
+      email?: string
+      full_name?: string
+      role?: string
     }
 
-    const validatedRole = ALLOWED_ROLES.includes(role) ? role : 'student'
+    let userId = id
 
-    // 1️⃣ Kiểm tra user đã tồn tại chưa
-    const { data: existingUser } = await supabaseAdmin
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .limit(1)
-      .maybeSingle()
+    // Nếu không có id nhưng có email → tìm user trong auth.users
+    if (!userId && email) {
+      const { data: found, error: findErr } = await supabaseAdmin
+        .from('auth.users')
+        .select('id')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle()
 
-    let userId = existingUser?.id
-
-    // 2️⃣ Nếu chưa có → tạo user mới
-    if (!userId) {
-      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // auto confirm để tránh chờ xác thực email
-      })
-      if (createErr) {
-        return NextResponse.json({ error: createErr.message }, { status: 500 })
+      if (findErr) {
+        return NextResponse.json({ error: 'Không thể tìm user: ' + findErr.message }, { status: 500 })
       }
-      userId = newUser.id
+
+      if (!found || !found.id) {
+        return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 })
+      }
+
+      userId = found.id
     }
 
-    // 3️⃣ Upsert profile
-    const { data: profileData, error: profileErr } = await supabaseAdmin
+    if (!userId) {
+      return NextResponse.json({ error: 'Phải cung cấp user id hoặc email' }, { status: 400 })
+    }
+
+    // Chuẩn hóa role
+    const validatedRole = role && ALLOWED_ROLES.includes(role) ? role : 'student'
+
+    // Build payload upsert
+    const upsertPayload: any = { id: userId, role: validatedRole, avatar_url: DEFAULT_AVATAR }
+    if (full_name) upsertPayload.full_name = full_name
+
+    const { data, error } = await supabaseAdmin
       .from('profiles')
-      .upsert(
-        {
-          id: userId,
-          full_name,
-          role: validatedRole,
-          avatar_url: DEFAULT_AVATAR,
-        },
-        { returning: 'representation' }
-      )
+      .upsert(upsertPayload, { returning: 'representation' })
 
-    if (profileErr) {
-      return NextResponse.json({ error: profileErr.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: 'Lỗi upsert profile: ' + error.message }, { status: 500 })
     }
 
-    return NextResponse.json({
-      ok: true,
-      userId,
-      profile: profileData?.[0] ?? null,
-    })
+    return NextResponse.json({ ok: true, profile: data?.[0] ?? null })
   } catch (err: any) {
-    console.error('Internal signup-user error', err)
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error: ' + (err instanceof Error ? err.message : String(err)) },
+      { status: 500 }
+    )
   }
 }
