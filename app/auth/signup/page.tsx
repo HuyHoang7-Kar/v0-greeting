@@ -43,17 +43,13 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      const signupOptions: any = {
-        emailRedirectTo: process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
-        data: { role, full_name: fullName },
-        user_metadata: { role, full_name: fullName },
-      }
-
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: signupOptions,
-      } as any)
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/login`,
+        },
+      })
 
       if (signUpError) {
         setError(signUpError.message ?? "Đăng ký thất bại, vui lòng thử lại.")
