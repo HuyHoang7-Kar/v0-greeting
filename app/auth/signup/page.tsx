@@ -4,16 +4,20 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function SignUpPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,6 +29,7 @@ export default function SignUpPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Gọi backend để upsert profile
   async function serverUpsertProfile(opts: { id?: string; email?: string }) {
     try {
       const res = await fetch('/api/internal/upsert-profile', {
@@ -44,12 +49,11 @@ export default function SignUpPage() {
     }
   }
 
+  // Nếu user chưa có trong auth.users, retry
   async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const res = await serverUpsertProfile({ email: emailToCheck })
-      if (res.ok && res.body?.ok) {
-        return { ok: true, profile: res.body.profile ?? null }
-      }
+      if (res.ok && res.body?.ok) return { ok: true, profile: res.body.profile ?? null }
       if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
         await new Promise((r) => setTimeout(r, delayMs))
         continue
@@ -76,8 +80,7 @@ export default function SignUpPage() {
     setIsLoading(true)
     try {
       const signupOptions: any = {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
+        emailRedirectTo: process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
         data: { role, full_name: fullName },
         user_metadata: { role, full_name: fullName },
       }
@@ -125,34 +128,18 @@ export default function SignUpPage() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Họ và Tên</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Nguyễn Văn A"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                />
+                <Input id="fullName" type="text" placeholder="Nguyễn Văn A" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Địa Chỉ Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nguyen@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                <Input id="email" type="email" placeholder="nguyen@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="role">Tôi là</Label>
                 <Select value={role} onValueChange={(value: 'student' | 'teacher' | 'admin') => setRole(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn vai trò của bạn" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Chọn vai trò của bạn" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học Sinh</SelectItem>
                     <SelectItem value="teacher">Giáo Viên</SelectItem>
@@ -163,43 +150,18 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Mật Khẩu</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
+                <Input id="confirmPassword" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
+              {info && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">{info}</div>}
 
-              {info && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
-                  {info}
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium" disabled={isLoading}>
                 {isLoading ? 'Đang tạo tài khoản...' : 'Tạo Tài Khoản'}
               </Button>
             </form>
