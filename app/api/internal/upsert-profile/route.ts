@@ -2,21 +2,23 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars for /api/internal/upsert-profile');
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
+
+// Allowed roles in profiles
+const ALLOWED_ROLES = ['student', 'teacher', 'admin'];
 
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
-    // Accept either { id, full_name, role } OR { email, full_name, role }
     const { id, email, full_name, role } = payload as {
       id?: string;
       email?: string;
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
 
     let userId = id;
 
-    // If no id but email provided, try find auth.users by email (service role can read auth.users)
+    // If no id, try find user by email
     if (!userId && email) {
       const { data: found, error: findErr } = await supabaseAdmin
         .from('auth.users')
@@ -41,7 +43,6 @@ export async function POST(req: Request) {
       }
 
       if (!found || !(found as any).id) {
-        // user not present yet (e.g. confirmation pending). Return 202 to indicate "not ready"
         return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 });
       }
 
@@ -52,13 +53,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 });
     }
 
-    // Build upsert payload for profiles
+    // Validate role
+    let validatedRole: string | undefined = undefined;
+    if (typeof role === 'string' && ALLOWED_ROLES.includes(role)) {
+      validatedRole = role;
+    }
+
+    // Build upsert payload
     const upsertPayload: any = { id: userId };
-    if (typeof full_name !== 'undefined') upsertPayload.full_name = full_name;
-    if (typeof role !== 'undefined') upsertPayload.role = role;
+    if (full_name) upsertPayload.full_name = full_name;
+    if (validatedRole) upsertPayload.role = validatedRole;
 
     const { data, error } = await supabaseAdmin
-      .from('public.profiles')
+      .from('profiles')
       .upsert(upsertPayload, { returning: 'representation' });
 
     if (error) {
