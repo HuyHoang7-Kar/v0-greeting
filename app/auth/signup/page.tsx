@@ -45,11 +45,13 @@ export default function SignUpPage() {
   }
 
   async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const res = await serverUpsertProfile({ email: emailToCheck })
-      if (res.ok && res.body?.ok) return { ok: true, profile: res.body.profile ?? null }
+      if (res.ok && res.body?.ok) {
+        return { ok: true, profile: res.body.profile ?? null }
+      }
       if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
-        await new Promise(r => setTimeout(r, delayMs))
+        await new Promise((r) => setTimeout(r, delayMs))
         continue
       }
       return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
@@ -73,15 +75,17 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      const redirectUrl = process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`
+      const signupOptions: any = {
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
+        data: { role, full_name: fullName },
+        user_metadata: { role, full_name: fullName },
+      }
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: { full_name: fullName, role }, // Chỉ cần data, bỏ user_metadata
-        },
+        options: signupOptions,
       } as any)
 
       if (signUpError) {
