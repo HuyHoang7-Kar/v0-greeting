@@ -25,7 +25,8 @@ export default function SignUpPage() {
   const [info, setInfo] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  async function serverUpsertProfile(opts: { id?: string; email?: string }) {
+  // API route để upsert profile
+  async function upsertProfile(opts: { id?: string; email?: string }) {
     try {
       const res = await fetch('/api/internal/upsert-profile', {
         method: 'POST',
@@ -37,26 +38,11 @@ export default function SignUpPage() {
         }),
       })
       const j = await res.json()
-      return { ok: res.ok, status: res.status, body: j }
+      return { ok: res.ok && j.ok, body: j }
     } catch (err) {
-      console.error('serverUpsertProfile error', err)
-      return { ok: false, status: 500, body: { error: String(err) } }
+      console.error('upsertProfile error', err)
+      return { ok: false, body: { error: String(err) } }
     }
-  }
-
-  async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const res = await serverUpsertProfile({ email: emailToCheck })
-      if (res.ok && res.body?.ok) {
-        return { ok: true, profile: res.body.profile ?? null }
-      }
-      if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
-        await new Promise((r) => setTimeout(r, delayMs))
-        continue
-      }
-      return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
-    }
-    return { ok: false, error: 'timeout_waiting_for_user', status: 408 }
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -75,17 +61,16 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      const signupOptions: any = {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
-        data: { role, full_name: fullName },
-        user_metadata: { role, full_name: fullName },
-      }
-
+      // Signup với Supabase
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: signupOptions,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
+          data: { role, full_name: fullName },
+          user_metadata: { role, full_name: fullName },
+        },
       } as any)
 
       if (signUpError) {
@@ -94,13 +79,30 @@ export default function SignUpPage() {
         return
       }
 
-      const userId = signUpData?.user?.id ?? null
+      const userId = signUpData?.user?.id
       if (userId) {
-        const res = await serverUpsertProfile({ id: userId })
-        if (!res.ok) console.warn('server upsert-profile (by id) failed', res)
-      } else {
-        const res = await tryUpsertWithRetry(email)
-        if (!res.ok) console.warn('server upsert-profile (by email) failed or timed out', res)
+        const upsertRes = await upsertProfile({ id: userId })
+        if (!upsertRes.ok) console.warn('Upsert profile failed:', upsertRes.body)
+      } else if (email) {
+        // fallback: thử upsert bằng email nếu userId chưa có (user chưa xác thực)
+        let attempts = 0
+        const maxAttempts = 6
+        const delayMs = 2000
+        let success = false
+        while (attempts < maxAttempts && !success) {
+          const res = await upsertProfile({ email })
+          if (res.ok) {
+            success = true
+            break
+          }
+          if (res.body?.message === 'user-not-found-yet') {
+            await new Promise((r) => setTimeout(r, delayMs))
+            attempts++
+          } else {
+            break
+          }
+        }
+        if (!success) console.warn('Upsert profile by email failed after retries')
       }
 
       setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
@@ -149,7 +151,7 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="role">Tôi là</Label>
-                <Select value={role} onValueChange={(value: 'student' | 'teacher' | 'admin') => setRole(value)}>
+                <Select value={role} onValueChange={(v: 'student' | 'teacher' | 'admin') => setRole(v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn vai trò của bạn" />
                   </SelectTrigger>
