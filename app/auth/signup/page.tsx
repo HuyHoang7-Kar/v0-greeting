@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createUserProfile } from "@/app/actions/create-profile"
+// import { createUserProfile } from "@/app/actions/create-profile"
 
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -41,6 +41,11 @@ export default function SignUpPage() {
       return
     }
 
+    if (!fullName.trim()) {
+      setError("Vui lòng nhập tên của bạn")
+      return
+    }
+
     setIsLoading(true)
     try {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -48,6 +53,11 @@ export default function SignUpPage() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/login`,
+          data: {
+            full_name: fullName,
+            role: role,
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+          },
         },
       })
 
@@ -55,22 +65,6 @@ export default function SignUpPage() {
         setError(signUpError.message ?? "Đăng ký thất bại, vui lòng thử lại.")
         setIsLoading(false)
         return
-      }
-
-      const userId = signUpData?.user?.id
-      if (userId) {
-        const profileResult = await createUserProfile(userId, {
-          email,
-          full_name: fullName,
-          role,
-        })
-
-        if (!profileResult.ok) {
-          console.warn("Profile creation failed:", profileResult.error)
-          setError("Tạo hồ sơ thất bại: " + profileResult.error)
-          setIsLoading(false)
-          return
-        }
       }
 
       setInfo("Đăng ký thành công. Kiểm tra email để xác thực nếu cần.")
