@@ -61,7 +61,7 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
-      // Signup với Supabase
+      // 1️⃣ Signup với Supabase Auth
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -69,7 +69,6 @@ export default function SignUpPage() {
           emailRedirectTo:
             process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
           data: { role, full_name: fullName },
-          user_metadata: { role, full_name: fullName },
         },
       } as any)
 
@@ -81,6 +80,7 @@ export default function SignUpPage() {
 
       const userId = signUpData?.user?.id
       if (userId) {
+        // 2️⃣ Upsert profile vào public.profiles
         const upsertRes = await upsertProfile({ id: userId })
         if (!upsertRes.ok) console.warn('Upsert profile failed:', upsertRes.body)
       } else if (email) {

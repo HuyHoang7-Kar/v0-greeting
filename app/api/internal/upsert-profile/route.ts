@@ -1,34 +1,44 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@supabase/supabase-js'
 
-// Chỉ chạy server-side với service role
-const SUPABASE_URL = process.env.SUPABASE_URL!
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+// Server-side env
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('[upsert-profile] Supabase env not set')
+  console.warn(
+    '[upsert-profile] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. HMR may trigger this warning.'
+  )
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-})
+// Khởi tạo Supabase Admin (server-side only)
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createServerClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false },
+      })
+    : null
 
 export async function POST(req: Request) {
-  try {
-    const { id, full_name, role, email } = await req.json() as {
-      id?: string
-      full_name?: string
-      role?: 'student' | 'teacher' | 'admin'
-      email?: string
-    }
+  if (!supabaseAdmin) {
+    return NextResponse.json(
+      { error: 'Supabase service role client not initialized' },
+      { status: 500 }
+    )
+  }
 
-    if (!id && !email) {
-      return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 })
+  try {
+    const payload = await req.json()
+    const { id, email, full_name, role } = payload as {
+      id?: string
+      email?: string
+      full_name?: string
+      role?: string
     }
 
     let userId = id
 
-    // Nếu không có id mà có email → tìm user trong auth.users
+    // Nếu chưa có id nhưng có email → tìm user
     if (!userId && email) {
       const { data: found, error: findErr } = await supabaseAdmin
         .from('auth.users')
@@ -37,11 +47,29 @@ export async function POST(req: Request) {
         .limit(1)
         .maybeSingle()
 
-      if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 })
-      if (!found?.id) return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 })
+      if (findErr) {
+        console.error('[upsert-profile] Error finding user by email:', findErr)
+        return NextResponse.json({ error: findErr.message }, { status: 500 })
+      }
+
+      if (!found?.id) {
+        return NextResponse.json(
+          { ok: false, message: 'user-not-found-yet' },
+          { status: 202 }
+        )
+      }
+
       userId = found.id
     }
 
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'must provide user id or email' },
+        { status: 400 }
+      )
+    }
+
+    // Upsert vào profiles
     const upsertPayload: any = { id: userId }
     if (full_name) upsertPayload.full_name = full_name
     if (role) upsertPayload.role = role
@@ -50,10 +78,14 @@ export async function POST(req: Request) {
       .from('profiles')
       .upsert(upsertPayload, { returning: 'representation' })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('[upsert-profile] Error upserting profile:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ ok: true, profile: data?.[0] ?? null })
   } catch (err: any) {
+    console.error('[upsert-profile] Unexpected error:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
