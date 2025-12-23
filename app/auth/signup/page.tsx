@@ -3,21 +3,17 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
+
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// ⚡ Supabase client cho signup
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export default function SignUpPage() {
   const router = useRouter()
+  const supabase = createClient()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,6 +24,40 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  async function serverUpsertProfile(opts: { id?: string; email?: string }) {
+    try {
+      const res = await fetch('/api/internal/upsert-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...opts,
+          full_name: fullName,
+          role,
+        }),
+      })
+      const j = await res.json()
+      return { ok: res.ok, status: res.status, body: j }
+    } catch (err) {
+      console.error('serverUpsertProfile error', err)
+      return { ok: false, status: 500, body: { error: String(err) } }
+    }
+  }
+
+  async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const res = await serverUpsertProfile({ email: emailToCheck })
+      if (res.ok && res.body?.ok) {
+        return { ok: true, profile: res.body.profile ?? null }
+      }
+      if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
+        await new Promise((r) => setTimeout(r, delayMs))
+        continue
+      }
+      return { ok: false, error: res.body ?? 'unknown_error', status: res.status }
+    }
+    return { ok: false, error: 'timeout_waiting_for_user', status: 408 }
+  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,51 +74,35 @@ export default function SignUpPage() {
     }
 
     setIsLoading(true)
-
     try {
-      // 1️⃣ Tạo user trong Supabase Auth
-      const { data: userData, error: signUpError } = await supabase.auth.signUp({
+      const signupOptions: any = {
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
+        data: { role, full_name: fullName },
+        user_metadata: { role, full_name: fullName },
+      }
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { role, full_name: fullName } // metadata tạm thời
-        }
-      })
+        options: signupOptions,
+      } as any)
 
       if (signUpError) {
-        setError(signUpError.message || 'Đăng ký thất bại')
+        setError(signUpError.message ?? 'Đăng ký thất bại, vui lòng thử lại.')
         setIsLoading(false)
         return
       }
 
-      if (!userData?.user?.id) {
-        setError('Không thể lấy ID user mới tạo')
-        setIsLoading(false)
-        return
+      const userId = signUpData?.user?.id ?? null
+      if (userId) {
+        const res = await serverUpsertProfile({ id: userId })
+        if (!res.ok) console.warn('server upsert-profile (by id) failed', res)
+      } else {
+        const res = await tryUpsertWithRetry(email)
+        if (!res.ok) console.warn('server upsert-profile (by email) failed or timed out', res)
       }
 
-      const userId = userData.user.id
-
-      // 2️⃣ Gọi API upsert-profile để lưu profile
-      const res = await fetch('/api/internal/upsert-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: userId,
-          full_name: fullName,
-          role
-        })
-      })
-
-      const result = await res.json()
-
-      if (!result.ok) {
-        setError(result.error || 'Lưu profile thất bại')
-        setIsLoading(false)
-        return
-      }
-
-      // ✅ Đăng ký thành công
       setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
       router.push('/auth/signup-success')
     } catch (err: unknown) {
@@ -111,18 +125,34 @@ export default function SignUpPage() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Họ và Tên</Label>
-                <Input id="fullName" type="text" placeholder="Nguyễn Văn A" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="Nguyễn Văn A"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Địa Chỉ Email</Label>
-                <Input id="email" type="email" placeholder="nguyen@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="nguyen@example.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="role">Tôi là</Label>
                 <Select value={role} onValueChange={(value: 'student' | 'teacher' | 'admin') => setRole(value)}>
-                  <SelectTrigger><SelectValue placeholder="Chọn vai trò của bạn" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn vai trò của bạn" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Học Sinh</SelectItem>
                     <SelectItem value="teacher">Giáo Viên</SelectItem>
@@ -133,25 +163,53 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Mật Khẩu</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Xác Nhận Mật Khẩu</Label>
-                <Input id="confirmPassword" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
               </div>
 
-              {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-              {info && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">{info}</div>}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
 
-              <Button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium" disabled={isLoading}>
+              {info && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+                  {info}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium"
+                disabled={isLoading}
+              >
                 {isLoading ? 'Đang tạo tài khoản...' : 'Tạo Tài Khoản'}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Đã có tài khoản? <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">Đăng nhập tại đây</Link>
+                Đã có tài khoản?{' '}
+                <Link href="/auth/login" className="font-medium text-yellow-600 hover:text-yellow-500">
+                  Đăng nhập tại đây
+                </Link>
               </p>
             </div>
           </CardContent>
