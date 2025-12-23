@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function SignUpPage() {
   const router = useRouter()
+  const supabase = createClient() // dùng hàm tạo client từ file client.ts
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +47,9 @@ export default function SignUpPage() {
   async function tryUpsertWithRetry(emailToCheck: string, maxAttempts = 6, delayMs = 2000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const res = await serverUpsertProfile({ email: emailToCheck })
-      if (res.ok && res.body?.ok) return { ok: true, profile: res.body.profile ?? null }
+      if (res.ok && res.body?.ok) {
+        return { ok: true, profile: res.body.profile ?? null }
+      }
       if (res.status === 202 && res.body?.message === 'user-not-found-yet') {
         await new Promise((r) => setTimeout(r, delayMs))
         continue
