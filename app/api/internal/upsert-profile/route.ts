@@ -1,91 +1,67 @@
-import { NextResponse } from 'next/server'
-import { createClient as createServerClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Server-side env
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Dùng service role để đọc/ghi profiles
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn(
-    '[upsert-profile] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. HMR may trigger this warning.'
-  )
-}
-
-// Khởi tạo Supabase Admin (server-side only)
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createServerClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false },
-      })
-    : null
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 export async function POST(req: Request) {
-  if (!supabaseAdmin) {
-    return NextResponse.json(
-      { error: 'Supabase service role client not initialized' },
-      { status: 500 }
-    )
-  }
-
   try {
-    const payload = await req.json()
+    const payload = await req.json();
     const { id, email, full_name, role } = payload as {
-      id?: string
-      email?: string
-      full_name?: string
-      role?: string
-    }
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    };
 
-    let userId = id
+    let userId = id;
 
-    // Nếu chưa có id nhưng có email → tìm user
+    // Nếu chưa có id nhưng có email, thử lấy user id từ auth.users
     if (!userId && email) {
       const { data: found, error: findErr } = await supabaseAdmin
         .from('auth.users')
         .select('id')
         .eq('email', email)
         .limit(1)
-        .maybeSingle()
+        .maybeSingle();
 
       if (findErr) {
-        console.error('[upsert-profile] Error finding user by email:', findErr)
-        return NextResponse.json({ error: findErr.message }, { status: 500 })
+        console.error('Error finding user by email', findErr);
+        return NextResponse.json({ error: findErr.message }, { status: 500 });
       }
 
       if (!found?.id) {
-        return NextResponse.json(
-          { ok: false, message: 'user-not-found-yet' },
-          { status: 202 }
-        )
+        return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 });
       }
 
-      userId = found.id
+      userId = found.id;
     }
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'must provide user id or email' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 });
     }
 
-    // Upsert vào profiles
-    const upsertPayload: any = { id: userId }
-    if (full_name) upsertPayload.full_name = full_name
-    if (role) upsertPayload.role = role
+    const upsertPayload: any = { id: userId };
+    if (full_name) upsertPayload.full_name = full_name;
+    if (role) upsertPayload.role = role;
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .upsert(upsertPayload, { returning: 'representation' })
+      .from('public.profiles')
+      .upsert(upsertPayload, { returning: 'representation' });
 
     if (error) {
-      console.error('[upsert-profile] Error upserting profile:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error upserting profile', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, profile: data?.[0] ?? null })
+    return NextResponse.json({ ok: true, profile: data?.[0] ?? null });
   } catch (err: any) {
-    console.error('[upsert-profile] Unexpected error:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    console.error('Internal upsert-profile error', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
