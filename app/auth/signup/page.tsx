@@ -1,9 +1,9 @@
+// app/page.tsx (SignUpPage)
 'use client'
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
 import { createClient } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// ⚡ Khởi tạo Supabase client với URL + ANON KEY
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -46,15 +45,15 @@ export default function SignUpPage() {
 
     setIsLoading(true)
     try {
+      // ⚡ Chỉ signup email + password
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo:
-            process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/login`,
-          data: { role, full_name: fullName }, // optional, metadata
+            process.env.NEXT_PUBLIC_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/signup-success`,
         },
-      } as any)
+      })
 
       if (signUpError) {
         setError(signUpError.message || 'Đăng ký thất bại, vui lòng thử lại.')
@@ -62,9 +61,14 @@ export default function SignUpPage() {
         return
       }
 
-      setInfo(
-        'Đăng ký thành công. Kiểm tra email để xác thực nếu cần.'
-      )
+      // ⚡ Gọi backend API để tạo profile với role + fullName
+      await fetch('/api/internal/upsert-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, full_name: fullName, role }),
+      })
+
+      setInfo('Đăng ký thành công. Kiểm tra email để xác thực nếu cần.')
       router.push('/auth/signup-success')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi')
