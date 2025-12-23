@@ -2,19 +2,30 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// ❗ Không dùng NEXT_PUBLIC_... cho server-side
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars for /api/internal/upsert-profile');
+  console.warn(
+    '⚠️ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars. ' +
+    'This API will fail until you set them in .env.local and restart the dev server.'
+  );
 }
 
-// **Chú ý:** đây là Service Role client, chỉ dùng server-side
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
+// Tạo Supabase client với Service Role (server-side only)
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  : null;
 
 export async function POST(req: Request) {
+  if (!supabaseAdmin) {
+    return NextResponse.json(
+      { error: 'Server misconfigured: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' },
+      { status: 500 }
+    );
+  }
+
   try {
     const payload = await req.json();
     const { id, email, full_name, role } = payload as {
@@ -27,7 +38,6 @@ export async function POST(req: Request) {
     let userId = id;
 
     if (!userId && email) {
-      // Lấy user id từ email (service role có quyền đọc auth.users)
       const { data: found, error: findErr } = await supabaseAdmin
         .from('auth.users')
         .select('id')
@@ -35,30 +45,38 @@ export async function POST(req: Request) {
         .limit(1)
         .maybeSingle();
 
-      if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 });
+      if (findErr) {
+        console.error('Error finding user by email', findErr);
+        return NextResponse.json({ error: findErr.message }, { status: 500 });
+      }
 
       if (!found?.id) {
-        // User chưa sẵn sàng (confirmation pending)
         return NextResponse.json({ ok: false, message: 'user-not-found-yet' }, { status: 202 });
       }
 
       userId = found.id;
     }
 
-    if (!userId) return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'must provide user id or email' }, { status: 400 });
+    }
 
     const upsertPayload: any = { id: userId };
     if (full_name) upsertPayload.full_name = full_name;
     if (role) upsertPayload.role = role;
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')  // không cần public.profiles
+      .from('public.profiles')
       .upsert(upsertPayload, { returning: 'representation' });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error('Error upserting profile', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, profile: data?.[0] ?? null });
   } catch (err: any) {
+    console.error('Internal upsert-profile error', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
